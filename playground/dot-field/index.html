@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dot Field — Playground — Kailan Huang</title>
+<meta name="description" content="A mouse-reactive dot grid. Part of Kailan Huang's AI playground.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --accent: #6e56cf; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: #fff; color: var(--ink); overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .bar {
+    position: fixed; left: 16px; right: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    font: 12px/1.4 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute);
+    pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .top { top: 16px; }
+  .top h1 { font: 400 24px/1 "Newsreader", Georgia, serif; letter-spacing: -.01em; text-transform: none; color: var(--ink); margin-right: auto; }
+  .top a { color: var(--ink); text-decoration: none; }
+  .top a:hover { color: var(--accent); }
+  .panel {
+    bottom: 16px; left: 16px; right: auto; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px;
+    display: grid; grid-template-columns: auto 140px 32px; gap: 8px 12px; max-width: calc(100% - 32px);
+  }
+  .panel input { accent-color: var(--accent); width: 100%; }
+  .panel output { color: var(--ink); text-align: right; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="bar top">
+  <h1>Dot Field</h1>
+  <a href="/playground/">← Playground</a>
+</div>
+<form class="bar panel" id="panel" aria-label="Dot field settings">
+  <label for="gap">Gap</label><input id="gap" type="range" min="14" max="48" value="28"><output for="gap"></output>
+  <label for="radius">Reach</label><input id="radius" type="range" min="60" max="400" value="180"><output for="radius"></output>
+  <label for="push">Push</label><input id="push" type="range" min="0" max="40" value="14"><output for="push"></output>
+  <label for="grow">Swell</label><input id="grow" type="range" min="0" max="12" step="0.2" value="4.6"><output for="grow"></output>
+</form>
+<script type="module">
+  import { mount } from '/assets/js/effects/dot-field.js';
+  const stage = document.getElementById('stage');
+  const form = document.getElementById('panel');
+  let unmount = null;
+  function apply() {
+    const opts = {};
+    for (const input of form.querySelectorAll('input')) {
+      opts[input.id] = Number(input.value);
+      form.querySelector(`output[for="${input.id}"]`).textContent = input.value;
+    }
+    if (unmount) unmount();
+    unmount = mount(stage, opts);
+  }
+  form.addEventListener('input', apply);
+  apply();
+</script>
+</body>
+</html>

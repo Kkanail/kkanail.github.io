@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playground — Kailan Huang</title>
+<meta name="description" content="Small things Kailan makes with AI — tools, visuals, toys.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/site.css">
+<script type="module" src="/assets/js/site.js"></script>
+</head>
+<body>
+<!-- NAV: keep identical on every page (only aria-current changes) -->
+<header class="site-nav">
+  <a class="brand" href="/">Kailan Huang</a>
+  <nav><ul>
+    <li><a href="/work/">Work</a></li>
+    <li><a href="/playground/" aria-current="page">Playground</a></li>
+    <li><a href="/notes/">Notes</a></li>
+    <li><a href="/about/">About</a></li>
+  </ul></nav>
+</header>
+<main>
+  <section class="page-head">
+    <div class="lead">
+      <span class="mono">Index / Playground</span>
+      <h1>Playground</h1>
+      <hr class="rule">
+      <p>Small things I make with AI — tools, visuals, toys. Some are polished, most are sketches.</p>
+    </div>
+    <div class="stat"><b id="exp-count">–</b><span class="mono" id="exp-updated">Experiments</span></div>
+  </section>
+  <!-- Filters and cards are generated from /data/experiments.json -->
+  <div class="filter-bar chips" id="exp-filters"></div>
+  <div class="cell-grid" id="playground"></div>
+</main>
+<!-- FOOTER: keep identical on every page -->
+<footer class="site-foot">
+  <span class="mono">© 2026 Kailan Huang</span>
+  <a class="mono email" href="mailto:kailanxh@gmail.com">kailanxh@gmail.com</a>
+  <a class="mono" href="/assets/kailan-huang-cv.pdf">Download CV</a>
+</footer>
+</body>
+</html>

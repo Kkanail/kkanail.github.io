@@ -1,0 +1,12 @@
+[
+  {
+    "slug": "dot-field",
+    "title": "Dot Field",
+    "date": "2026-11-08",
+    "description": "A mouse-reactive dot grid — dots swell, drift away and turn purple near your cursor. Built with Claude; it also lives on my homepage.",
+    "tags": ["AI", "Interaction", "Canvas"],
+    "label": "New",
+    "link": "/playground/dot-field/",
+    "thumb": "/playground/dot-field/thumb.png"
+  }
+]

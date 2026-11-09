@@ -10,6 +10,8 @@ const CONFIG = {
   maxCount: 9,
   water: true,           // faint drifting specks in the background
   fishScale: 0.26,       // body length as a fraction of min(viewport w, h)
+  tiles: true,           // coloured square tiles behind body characters (daoho-style grid)
+  finTile: 0.16,         // tile strength under fin strands (0 = lines only)
   rippleSpeed: 150,      // px / s
   rippleLife: 2.4,       // s
   foodLife: 24,          // s
@@ -38,7 +40,8 @@ export function mount(el, options = {}) {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let W = 0, H = 0, dpr = 1, cw = 0, chh = 0, cols = 0, rows = 0;
-  let I, T, C, K;              // per-cell intensity, tone, char code, kind (0 ink, 1 eye, 2 ring/speck)
+  let I, T, C, K;              // per-cell intensity, tone, char code, kind (0 ink, 1 eye, 2 speck, 3 ring, 4 eye highlight)
+  let F, FT;                   // per-cell tile strength and tile tone (tone < 0 = pupil tile)
   let styles = null;
   let fish = [], ripples = [], food = [];
   let raf = 0, last = performance.now(), time = 0;
@@ -51,10 +54,11 @@ export function mount(el, options = {}) {
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cw = o.fontSize * 0.6; chh = o.fontSize * 1.0;
+    cw = o.fontSize * 0.72; chh = o.fontSize * 0.94; // near-square cells so tiles read as a grid
     cols = Math.ceil(W / cw); rows = Math.ceil(H / chh);
     const n = cols * rows;
     I = new Float32Array(n); T = new Float32Array(n); C = new Uint16Array(n); K = new Uint8Array(n);
+    F = new Float32Array(n); FT = new Float32Array(n);
     buildStyles();
     const L = Math.min(W, H) * o.fishScale;
     for (const f of fish) f.resize(L * f.sizeK);
@@ -64,12 +68,14 @@ export function mount(el, options = {}) {
   function buildStyles() {
     const th = o.themes[o.theme];
     const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
-    styles = { ink: [], eye: `rgb(${th.eye.join(',')})`, ring: [], speck: [] };
+    styles = { ink: [], onTile: [], eye: `rgb(${th.eye.join(',')})`, glint: `rgb(${th.pale.join(',')})`, ring: [], speck: [] };
     for (let t = 0; t < 12; t++) {
       const row = [];
       const c = mix(th.deep, th.pale, t / 11);
       for (let a = 0; a < 10; a++) row.push(`rgba(${c.join(',')},${((a + 1) / 10).toFixed(2)})`);
       styles.ink.push(row);
+      const d = c.map((v) => Math.round(v * 0.52));
+      styles.onTile.push(`rgb(${d.join(',')})`);
     }
     for (let a = 0; a < 10; a++) {
       styles.ring.push(`rgba(${th.ring.join(',')},${((a + 1) / 10).toFixed(2)})`);
@@ -84,6 +90,14 @@ export function mount(el, options = {}) {
     const i = cy * cols + cx;
     if (!force && inten <= I[i]) return;
     I[i] = inten; T[i] = tone; C[i] = ch.charCodeAt(0); K[i] = kind;
+  }
+
+  function tile(x, y, a, tone, force = false) {
+    const cx = Math.floor(x / cw), cy = Math.floor(y / chh);
+    if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return;
+    const i = cy * cols + cx;
+    if (!force && a <= F[i]) return;
+    F[i] = a; FT[i] = tone;
   }
 
   // Character for a line segment, judged in cell units so diagonals land on / and \.
@@ -102,7 +116,11 @@ export function mount(el, options = {}) {
     const step = Math.min(cw, chh) * 0.5;
     const n = Math.max(1, Math.ceil(len / step));
     const ch = lineChar(dx, dy);
-    for (let s = 0; s <= n; s++) put(ax + dx * s / n, ay + dy * s / n, ch, inten, tone, kind);
+    for (let s = 0; s <= n; s++) {
+      const x = ax + dx * s / n, y = ay + dy * s / n;
+      put(x, y, ch, inten, tone, kind);
+      if (o.tiles && kind === 0 && o.finTile > 0) tile(x, y, inten * o.finTile, tone);
+    }
   }
 
   /* ---------- fish ---------- */
@@ -275,10 +293,18 @@ export function mount(el, options = {}) {
         if (e > 1) continue;
         const vd = blat / hh; // -1 belly … +1 back
         const x = qx, y = qy;
+        if (o.tiles) {
+          const n = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;           // stable per-cell noise for a mottled look
+          const jit = ((n % 1000) / 1000 - 0.5) * 0.22;
+          const back = Math.max(0, vd), belly = Math.max(0, -vd);
+          const tTone = dark ? clamp(0.05 + belly * 0.55 + jit, 0, 1) : clamp(0.32 - back * 0.25 + belly * 0.62 + jit + (u < 0.26 ? 0.08 : 0), 0, 1);
+          const tA = (dark ? 0.75 : 0.92) * (1 - smooth((u - 0.86) / 0.14) * 0.6) * (e > 0.9 ? 0.55 : 1);
+          tile(x, y, tA, tTone, true);
+        }
         // eye
         const ex = L * 0.11, ey = 0.2, er = L * 0.065;
         const de = Math.hypot((balong - ex) / er, (vd - ey) * hh / er);
-        if (de < 0.5) { put(x, y, '@', 1, 0, 1, true); continue; }
+        if (de < 0.5) { if (o.tiles) { tile(x, y, 1, -1, true); put(x, y, 'o', 1, 0, 4, true); } else put(x, y, '@', 1, 0, 1, true); continue; }
         if (de < 1.1) { put(x, y, de < 0.8 ? ' ' : lineChar(-(vd - ey) * hh, balong - ex), de < 0.8 ? 0.05 : 1, 0.95, 0, true); continue; }
         if (e > 0.86) { // outline
           const ang = balong < this.hw(0) * 0.3 ? Math.atan2(-vd, Math.max(0.2, -balong / L * 6 + 0.5)) : 0;
@@ -381,7 +407,7 @@ export function mount(el, options = {}) {
 
   /* ---------- frame ---------- */
   function draw() {
-    I.fill(0);
+    I.fill(0); F.fill(0);
     const th = o.themes[o.theme];
     // water specks
     if (o.water) {
@@ -410,11 +436,23 @@ export function mount(el, options = {}) {
     ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, H);
     ctx.font = `${o.fontSize}px "DM Mono", ui-monospace, Menlo, monospace`;
     ctx.textBaseline = 'top';
+    if (o.tiles) {
+      for (let i = 0, n = cols * rows; i < n; i++) {
+        const a = F[i]; if (a < 0.03) continue;
+        ctx.fillStyle = FT[i] < 0 ? styles.eye : styles.ink[Math.min(11, Math.floor(FT[i] * 11.99))][Math.min(9, Math.floor(a * 10))];
+        ctx.fillRect((i % cols) * cw + 0.5, Math.floor(i / cols) * chh + 0.5, cw - 1, chh - 1);
+      }
+    }
     for (let i = 0, n = cols * rows; i < n; i++) {
       const v = I[i]; if (v < 0.04) continue;
+      if (o.tiles && F[i] > 0.4 && K[i] === 0) {
+        ctx.fillStyle = styles.onTile[Math.min(11, Math.floor(FT[i] * 11.99))];
+        ctx.fillText(String.fromCharCode(C[i]), (i % cols) * cw + cw * 0.08, Math.floor(i / cols) * chh + chh * 0.02);
+        continue;
+      }
       const a = Math.min(9, Math.floor(v * 10));
       const k = K[i];
-      ctx.fillStyle = k === 1 ? styles.eye : k === 2 ? styles.speck[Math.min(2, a)] : k === 3 ? styles.ring[a] : styles.ink[Math.min(11, Math.floor(T[i] * 11.99))][a];
+      ctx.fillStyle = k === 4 ? styles.glint : k === 1 ? styles.eye : k === 2 ? styles.speck[Math.min(2, a)] : k === 3 ? styles.ring[a] : styles.ink[Math.min(11, Math.floor(T[i] * 11.99))][a];
       ctx.fillText(String.fromCharCode(C[i]), (i % cols) * cw, Math.floor(i / cols) * chh);
     }
   }

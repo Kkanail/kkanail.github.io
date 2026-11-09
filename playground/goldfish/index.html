@@ -54,7 +54,6 @@
   const root = document.documentElement;
   const params = new URLSearchParams(location.search);
   const pond = mount(document.getElementById('pond'), { theme: 'light', count: 3, fontSize: 11, still: params.has('still') });
-  window.__pondState = () => pond.getState(); // read-only, for automated checks
   const themeBtn = document.getElementById('theme');
   themeBtn.addEventListener('click', () => {
     const next = pond.getState().theme === 'light' ? 'dark' : 'light';

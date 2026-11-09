@@ -11,7 +11,7 @@ const CONFIG = {
   maxCount: 9,
   still: false,          // review mode: fish hold position, only fins move
   water: true,           // faint drifting specks in the background
-  fishScale: 0.22,       // body length (head to tail root) as a fraction of min(viewport w, h)
+  fishScale: 0.26,       // spine length (snout to tail start ÷ 0.75) as a fraction of min(viewport w, h)
   finTile: 0.45,         // tile strength under fin strands (0 = lines only)
   shadow: 0.9,           // strength of the shadow each fish casts (0 = none)
   rippleSpeed: 150,      // px / s
@@ -39,6 +39,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
 const wrap = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
 const rand = (a, b) => a + Math.random() * (b - a);
+const BODY = 0.75; // the body is drawn along the front 3/4 of the spine; the tail starts there
 const hash = (x, y) => (((x * 73856093) ^ (y * 19349663)) >>> 0) % 1000 / 1000;
 
 export function mount(el, options = {}) {
@@ -190,10 +191,10 @@ export function mount(el, options = {}) {
     hw(u) {
       const front = u < 0.3 ? 0.7 + 0.3 * Math.sin((u / 0.3) * Math.PI / 2) : 1;
       const back = 1 - 0.82 * Math.pow(smooth((u - 0.46) / 0.54), 0.8);
-      return this.L * 0.35 * front * back;
+      return this.L * 0.3 * front * back;
     }
-    frame(u) { // point, forward unit vector, left unit vector at u
-      const f = clamp(u, 0, 1) * (this.n - 1);
+    frame(u) { // body coordinate u (0 = snout, 1 = tail start) -> point, forward and left unit vectors
+      const f = clamp(u * BODY, 0, 1) * (this.n - 1);
       const i = Math.min(this.n - 2, Math.floor(f)), t = f - i;
       const a = this.spine[i], b = this.spine[i + 1];
       let fx = a.x - b.x, fy = a.y - b.y; const l = Math.hypot(fx, fy) || 1; fx /= l; fy /= l;
@@ -297,7 +298,7 @@ export function mount(el, options = {}) {
             else {
               const ft = o.themes[o.theme].finTile ?? o.finTile;
               const base = 1 - smooth((q - 0.1) / 0.3); // 1 at the root, 0 from 40% out
-              stroke(s.p[k - 1].x, s.p[k - 1].y, s.p[k].x, s.p[k].y, inten, clamp(tone, 0, 1), inten * (ft + (0.9 - ft) * base * (fin.u === 1 ? 1 : 0)));
+              stroke(s.p[k - 1].x, s.p[k - 1].y, s.p[k].x, s.p[k].y, inten, clamp(tone, 0, 1), inten * (ft + (0.6 - ft) * base * (fin.u === 1 ? 1 : 0)));
             }
           }
         }
@@ -340,7 +341,7 @@ export function mount(el, options = {}) {
           const a = this.spine[i], b = this.spine[i + 1];
           const ex = b.x - a.x, ey = b.y - a.y, ll = ex * ex + ey * ey || 1;
           const t = ((x - a.x) * ex + (y - a.y) * ey) / ll;
-          const tc = i === 0 ? Math.max(t, -0.7) : i === this.n - 2 ? clamp(t, 0, 1.6) : clamp(t, 0, 1);
+          const tc = i === 0 ? Math.max(t, -0.7) : clamp(t, 0, 1);
           const px = a.x + ex * tc, py = a.y + ey * tc;
           const d = Math.hypot(x - px, y - py);
           if (d < bd) {
@@ -350,17 +351,18 @@ export function mount(el, options = {}) {
             blat = t === tc ? perp : (perp >= 0 ? 1 : -1) * d;
           }
         }
-        const u = clamp(bu, 0, 1), along = bu * L;
+        const ub = bu / BODY;                       // body coordinate
+        const u = clamp(ub, 0, 1), along = ub * L * BODY;
         const w = this.hw(u);
         let e = Math.abs(blat) / w;
         if (along < 0) e = Math.hypot(along / (this.hw(0) * 0.7), e); // rounded snout
-        if (bu > 1) e = Math.hypot((bu - 1) * L / (this.hw(1) * 1.4), e); // rounded tail root that the tail grows from
+        if (ub > 1) e = Math.hypot((ub - 1) * L * BODY / (this.hw(1) * 1.1), e); // small round end where the tail begins
         if (e > 1) continue;
         const nz = hash(cx, cy);
         const pattern = Math.sin(u * 7 + this.seed) * Math.cos(blat / L * 9 + this.seed * 1.7) + Math.sin(u * 3.1 - blat / L * 5 + this.seed * 0.3) * 0.5;
         const tone = clamp(v.body(pattern) + (nz - 0.5) * 0.12, 0, 1);
         const edge = e > 0.88;
-        const tailFade = smooth((u - 0.85) / 0.15) * 0.3;
+        const tailFade = 0;
         // oranda wen: bumpy red cap over the top of the head
         if (v.wen && u < 0.32 && e < 0.97) {
           // hex lattice of bumps in body coordinates; each bump is lit in the middle and dark at its rim
@@ -381,7 +383,7 @@ export function mount(el, options = {}) {
           continue;
         }
         // scales: staggered rows of brackets
-        const su = (along - L * 0.26) / scale;
+        const su = (along - L * BODY * 0.26) / scale;
         const row = Math.floor(blat / scale + 100);
         const fu = (su + (row % 2) * 0.5) % 1;
         const fv = (blat / scale + 100) % 1;
@@ -405,13 +407,13 @@ export function mount(el, options = {}) {
           off: (opts.off || 0) * (q - 0.5), tj: (Math.random() - 0.5) * (opts.toneJitter || 0.1), p });
       }
       return { u: opts.u, v: opts.v || 0, side: opts.side || 1, layer: opts.layer || 0, sway: opts.sway, freq: opts.freq,
-        maxA: opts.maxA ?? 2.2, minA: opts.minA ?? -2.2,
+        maxA: opts.maxA ?? Math.PI, minA: opts.minA ?? -Math.PI,
         inten: opts.inten ?? 1, tone0: opts.tone0, tone1: opts.tone1, strands };
     };
     // twin tail: one lobe to each side, spreading wide; telescope tails are mostly white with a red core
     for (const side of [1, -1]) {
-      fins.push(fan({ u: 1, side, count: 24, a0: 4 * D, a1: 70 * D, off: 0.36, segs: 15, maxA: 92 * D, minA: -12 * D,
-        len: (q) => (0.9 + 0.62 * Math.sin(q * Math.PI * 0.8)) * 0.8, curl: (q) => 0.12 + q * 0.25, sway: 0.32, freq: 1.8, // tail length scaled to 0.8
+      fins.push(fan({ u: 1, side, count: 24, a0: 4 * D, a1: 82 * D, off: 0.36, segs: 15,
+        len: (q) => (0.9 + 0.62 * Math.sin(q * Math.PI * 0.8)) * 0.8, curl: (q) => 0.3 + q * 0.4, sway: 0.4, freq: 1.8, // tail length scaled to 0.8
         tone0: v.tailBase, tone1: v.tailTip, toneJitter: v.tailWhite ? 0.3 : 0.12 }));
     }
     // pectoral fins
@@ -551,11 +553,6 @@ export function mount(el, options = {}) {
   cleanup.setCount = (n) => { o.count = clamp(Math.round(n), 1, o.maxCount); syncCount(); if (reduce) draw(); return o.count; };
   cleanup.setFontSize = (px) => { o.fontSize = clamp(px, 6, 28); layout(); };
   cleanup.getState = () => ({ theme: o.theme, count: o.count, fontSize: o.fontSize,
-    fish: fish.map((f) => ({ x: Math.round(f.spine[0].x), y: Math.round(f.spine[0].y), flee: +f.flee.toFixed(2), speed: Math.round(f.speed) })), food: food.length, size: [Math.round(W), Math.round(H)],
-    // widest tail-strand angle from straight back, in degrees (for checking the tail never folds forward)
-    tailMaxDeg: Math.round(Math.max(0, ...fish.flatMap((f) => f.fins.filter((fn) => fn.u === 1).flatMap((fn) => {
-      const fr = f.frame(1), back = Math.atan2(-fr.fy, -fr.fx);
-      return fn.strands.flatMap((st) => st.p.slice(1).map((pt, k) => Math.abs(wrap(Math.atan2(pt.y - st.p[k].y, pt.x - st.p[k].x) - back)) * 180 / Math.PI));
-    })))) });
+    fish: fish.map((f) => ({ x: Math.round(f.spine[0].x), y: Math.round(f.spine[0].y), flee: +f.flee.toFixed(2), speed: Math.round(f.speed) })), food: food.length, size: [Math.round(W), Math.round(H)] });
   return cleanup;
 }

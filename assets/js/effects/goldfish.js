@@ -147,15 +147,15 @@ export function mount(el, options = {}) {
     return '/';
   }
 
-  function stroke(ax, ay, bx, by, inten, tone) {
+  function stroke(ax, ay, bx, by, inten, tone, tileA) {
     const dx = bx - ax, dy = by - ay;
     const n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (Math.min(cw, chh) * 0.5)));
     const ch = lineChar(dx, dy);
     for (let s = 0; s <= n; s++) {
       const x = ax + dx * s / n, y = ay + dy * s / n;
       put(x, y, ch, inten, tone);
-      const ft = o.themes[o.theme].finTile ?? o.finTile;
-      if (ft > 0) tile(x, y, inten * ft, tone);
+      const ft = tileA ?? inten * (o.themes[o.theme].finTile ?? o.finTile);
+      if (ft > 0) tile(x, y, ft, tone);
     }
   }
 
@@ -273,7 +273,7 @@ export function mount(el, options = {}) {
             const bx = -fr.fx * Math.cos(a) + fr.lx * Math.sin(a);
             const by = -fr.fy * Math.cos(a) + fr.ly * Math.sin(a);
             const tx = s.p[k - 1].x + bx * s.seg, ty = s.p[k - 1].y + by * s.seg;
-            const st = init ? 1 : Math.min(1, (0.5 - 0.38 * q) * dt * 60);
+            const st = init || q < 0.3 ? 1 : Math.min(1, (0.5 - 0.38 * q) * dt * 60); // root stays attached, tips trail
             s.p[k].x += (tx - s.p[k].x) * st; s.p[k].y += (ty - s.p[k].y) * st;
             const dx = s.p[k].x - s.p[k - 1].x, dy = s.p[k].y - s.p[k - 1].y, l = Math.hypot(dx, dy) || 1;
             s.p[k].x = s.p[k - 1].x + dx / l * s.seg; s.p[k].y = s.p[k - 1].y + dy / l * s.seg;
@@ -291,7 +291,11 @@ export function mount(el, options = {}) {
             const inten = (1 - q * 0.35) * fin.inten;
             const tone = fin.tone0 + (fin.tone1 - fin.tone0) * smooth(q * 1.2) + s.tj;
             if (k === n - 1) put(s.p[k].x, s.p[k].y, "'", inten * 0.8, clamp(tone, 0, 1));
-            else stroke(s.p[k - 1].x, s.p[k - 1].y, s.p[k].x, s.p[k].y, inten, clamp(tone, 0, 1));
+            else {
+              const ft = o.themes[o.theme].finTile ?? o.finTile;
+              const base = 1 - smooth((q - 0.1) / 0.3); // 1 at the root, 0 from 40% out
+              stroke(s.p[k - 1].x, s.p[k - 1].y, s.p[k].x, s.p[k].y, inten, clamp(tone, 0, 1), inten * (ft + (0.9 - ft) * base * (fin.u === 1 ? 1 : 0)));
+            }
           }
         }
       }
@@ -333,7 +337,7 @@ export function mount(el, options = {}) {
           const a = this.spine[i], b = this.spine[i + 1];
           const ex = b.x - a.x, ey = b.y - a.y, ll = ex * ex + ey * ey || 1;
           const t = ((x - a.x) * ex + (y - a.y) * ey) / ll;
-          const tc = i === 0 ? Math.max(t, -0.7) : clamp(t, 0, 1);
+          const tc = i === 0 ? Math.max(t, -0.7) : i === this.n - 2 ? clamp(t, 0, 1.6) : clamp(t, 0, 1);
           const px = a.x + ex * tc, py = a.y + ey * tc;
           const d = Math.hypot(x - px, y - py);
           if (d < bd) {
@@ -343,17 +347,17 @@ export function mount(el, options = {}) {
             blat = t === tc ? perp : (perp >= 0 ? 1 : -1) * d;
           }
         }
-        if (bu > 1) continue;
-        const u = Math.max(bu, 0), along = bu * L;
+        const u = clamp(bu, 0, 1), along = bu * L;
         const w = this.hw(u);
         let e = Math.abs(blat) / w;
         if (along < 0) e = Math.hypot(along / (this.hw(0) * 0.7), e); // rounded snout
+        if (bu > 1) e = Math.hypot((bu - 1) * L / (this.hw(1) * 1.4), e); // rounded tail root that the tail grows from
         if (e > 1) continue;
         const nz = hash(cx, cy);
         const pattern = Math.sin(u * 7 + this.seed) * Math.cos(blat / L * 9 + this.seed * 1.7) + Math.sin(u * 3.1 - blat / L * 5 + this.seed * 0.3) * 0.5;
         const tone = clamp(v.body(pattern) + (nz - 0.5) * 0.12, 0, 1);
         const edge = e > 0.88;
-        const tailFade = smooth((u - 0.85) / 0.15);
+        const tailFade = smooth((u - 0.85) / 0.15) * 0.3;
         // oranda wen: bumpy red cap over the top of the head
         if (v.wen && u < 0.32 && e < 0.97) {
           // hex lattice of bumps in body coordinates; each bump is lit in the middle and dark at its rim

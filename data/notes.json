@@ -2,6 +2,15 @@
   {
     "date": "2026-11-09",
     "type": "note",
+    "title": "今天實現了夢想的金魚 🐟",
+    "tags": [
+      "Life"
+    ],
+    "link": "/playground/goldfish/"
+  },
+  {
+    "date": "2026-11-09",
+    "type": "note",
     "title": "用文字畫一隻會游的金魚",
     "excerpt": "ASCII 金魚是怎麼做出來的：八個可以直接玩的小步驟，從一個會動的點，到一池會搶飼料的金魚。",
     "tags": [

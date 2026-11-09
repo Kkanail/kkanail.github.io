@@ -14,6 +14,9 @@ Ask only for what you can't infer, in one message:
 - **What it is** — one sentence. You write the final description; Kailan doesn't need to.
 - **Where it lives** — one of:
   - code/HTML Kailan pasted or attached → host it in `playground/<slug>/index.html`
+  - a file in the Google Drive **Playground inbox** (see CLAUDE.md for the folder id) → download it, read all of it,
+    then host it like pasted code. Usually made by another Claude following `playground/HANDOFF.md`, so it may already
+    have a CONFIG object, tags and a one-line description you can reuse.
   - an external link (Claude artifact, CodePen, YouTube, Figma…) → link out to it
 - **A preview image** if they have one (screenshot/GIF). If not, you will make one (step 3).
 

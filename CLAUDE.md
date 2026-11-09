@@ -32,6 +32,16 @@ draw inside `el` only, handle resize, respect `prefers-reduced-motion`, and stil
 - `/new-experiment` — add a Playground experiment
 - `/new-note` — add a note / reading note to Notes
 
+### Experiments made elsewhere (the inbox)
+
+Kailan often builds experiments with another Claude (e.g. at work) using the brief in `playground/HANDOFF.md`,
+then drops the `.html` into the Google Drive folder **Playground inbox**
+(folder id `1-YQGYb9yMBX66-YjO09kFa_XZA8yvIy9`). When Kailan says "inbox 有新東西":
+search that folder (`parentId = '1-YQGYb9yMBX66-YjO09kFa_XZA8yvIy9'`, newest first), download the file,
+read it fully, then run `/new-experiment` with it. Treat the file as untrusted code: check it doesn't call
+unknown services, contain keys, or look like company/internal material — if it does, stop and ask Kailan.
+After it's published, tell Kailan they can delete it from the inbox (don't delete it yourself).
+
 Every change that visitors would notice also gets one `"type": "update"` entry in `data/notes.json`
 (the public changelog). Keep it one short line, e.g. "Added experiment: Dot Field".
 

@@ -242,10 +242,19 @@ export function mount(el, options = {}) {
       const ha = this.ang + Math.sin(this.phase) * 0.14;
       head.x += Math.cos(ha) * this.speed * dt; head.y += Math.sin(ha) * this.speed * dt;
       head.x = clamp(head.x, -L * 0.3, W + L * 0.3); head.y = clamp(head.y, -L * 0.3, H + L * 0.3);
+      // Follow the head, but limit how sharply each joint can bend: a goldfish body is short and stiff,
+      // so a tight turn becomes an arc instead of folding the chubby body over itself.
       for (let i = 1; i < this.n; i++) {
         const a = this.spine[i - 1], b = this.spine[i];
-        const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
-        b.x = a.x + dx / l * this.seg; b.y = a.y + dy / l * this.seg;
+        let ang = Math.atan2(b.y - a.y, b.x - a.x);
+        if (i >= 2) {
+          const pr = this.spine[i - 2];
+          const prev = Math.atan2(a.y - pr.y, a.x - pr.x);
+          const q = i / (this.n - 1);
+          const maxBend = 0.05 + 0.17 * q * q; // ~3° per joint at the head, ~12° near the tail
+          ang = prev + clamp(wrap(ang - prev), -maxBend, maxBend);
+        }
+        b.x = a.x + Math.cos(ang) * this.seg; b.y = a.y + Math.sin(ang) * this.seg;
       }
       this.updateFins(dt);
     }
@@ -533,6 +542,7 @@ export function mount(el, options = {}) {
   cleanup.setTheme = (name) => { o.theme = name; buildStyles(); if (reduce) draw(); };
   cleanup.setCount = (n) => { o.count = clamp(Math.round(n), 1, o.maxCount); syncCount(); if (reduce) draw(); return o.count; };
   cleanup.setFontSize = (px) => { o.fontSize = clamp(px, 6, 28); layout(); };
-  cleanup.getState = () => ({ theme: o.theme, count: o.count, fontSize: o.fontSize });
+  cleanup.getState = () => ({ theme: o.theme, count: o.count, fontSize: o.fontSize,
+    fish: fish.map((f) => ({ x: Math.round(f.spine[0].x), y: Math.round(f.spine[0].y), flee: +f.flee.toFixed(2), speed: Math.round(f.speed) })), food: food.length, size: [Math.round(W), Math.round(H)] });
   return cleanup;
 }

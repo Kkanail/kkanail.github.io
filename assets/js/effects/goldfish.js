@@ -13,13 +13,17 @@ const CONFIG = {
   water: true,           // faint drifting specks in the background
   fishScale: 0.22,       // body length (head to tail root) as a fraction of min(viewport w, h)
   finTile: 0.45,         // tile strength under fin strands (0 = lines only)
+  shadow: 0.9,           // strength of the shadow each fish casts (0 = none)
   rippleSpeed: 150,      // px / s
+  rippleWave: 24,        // px between ripple crests
   rippleLife: 2.4,       // s
   foodLife: 24,          // s
   // One colour ramp per theme: tone 0 = red, 0.45 = orange, 1 = white
   themes: {
-    light: { bg: '#ffffff', stops: [[196, 40, 28], [234, 104, 36], [246, 236, 228]], eye: [16, 24, 32], glint: [255, 255, 255], ring: [110, 86, 207], speck: [16, 24, 32] },
-    dark:  { bg: '#0c0c0d', stops: [[214, 48, 30], [244, 120, 44], [252, 244, 236]], eye: [8, 8, 9], glint: [255, 255, 255], ring: [255, 214, 172], speck: [255, 255, 255] },
+    light: { bg: '#ffffff', stops: [[196, 40, 28], [234, 104, 36], [246, 236, 228]], eye: [16, 24, 32], glint: [255, 255, 255], ring: [150, 156, 162], speck: [16, 24, 32],
+             shade: [16, 24, 32], shadeA: 0.16, waveDark: [96, 104, 112], waveDarkA: 0.22, waveLight: [255, 255, 255], waveLightA: 0.85 },
+    dark:  { bg: '#0c0c0d', stops: [[214, 48, 30], [244, 120, 44], [252, 244, 236]], eye: [8, 8, 9], glint: [255, 255, 255], ring: [200, 200, 204], speck: [255, 255, 255],
+             shade: [0, 0, 0], shadeA: 0.6, waveDark: [0, 0, 0], waveDarkA: 0.45, waveLight: [255, 255, 255], waveLightA: 0.3 },
   },
 };
 
@@ -49,6 +53,8 @@ export function mount(el, options = {}) {
   let W = 0, H = 0, dpr = 1, cw = 0, chh = 0, cols = 0, rows = 0;
   let I, T, C, K;   // per-cell char intensity, tone, char code, kind (0 ink, 1 pupil, 2 speck, 3 ring, 4 glint)
   let F, FT;        // per-cell tile strength and tile tone (tone < 0 = pupil tile)
+  let Z, S, RW, RG; // per-cell owner (fish index + 1), shadow strength, ripple light / dark
+  let curZ = 0, touched = [];
   let styles = null;
   let fish = [], ripples = [], food = [];
   let raf = 0, last = performance.now(), time = 0;
@@ -66,6 +72,7 @@ export function mount(el, options = {}) {
     const n = cols * rows;
     I = new Float32Array(n); T = new Float32Array(n); C = new Uint16Array(n); K = new Uint8Array(n);
     F = new Float32Array(n); FT = new Float32Array(n);
+    Z = new Uint8Array(n); S = new Float32Array(n); RW = new Float32Array(n); RG = new Float32Array(n);
     buildStyles();
     const L = Math.min(W, H) * o.fishScale;
     for (const f of fish) f.resize(L * f.sizeK);
@@ -111,6 +118,23 @@ export function mount(el, options = {}) {
     const i = cellAt(x, y); if (i < 0) return;
     if (!force && a <= F[i]) return;
     F[i] = a; FT[i] = tone;
+    if (curZ) { Z[i] = curZ; S[i] = 0; touched.push(i); } // a fish on top hides shadows below it
+  }
+
+  // Cast the current fish's shadow down-right onto the pond floor and onto fish beneath it.
+  function castShadow(L) {
+    if (!o.shadow) return;
+    const dx = Math.max(1, Math.round(L * 0.05 / cw)), dy = Math.max(1, Math.round(L * 0.07 / chh));
+    for (const i of touched) {
+      const cx = i % cols, cy = (i / cols) | 0;
+      for (const [ox, oy, k] of [[dx, dy, 1], [dx + 1, dy + 1, 0.5]]) {
+        if (cx + ox >= cols || cy + oy >= rows) continue;
+        const j = (cy + oy) * cols + cx + ox;
+        if (Z[j] === curZ) continue;
+        const v = Math.min(1, F[i] * 1.2) * o.shadow * k;
+        if (v > S[j]) S[j] = v;
+      }
+    }
   }
 
   // Character for a line segment, judged in cell units so diagonals land on / and \.
@@ -415,7 +439,7 @@ export function mount(el, options = {}) {
 
   /* ---------- frame ---------- */
   function draw() {
-    I.fill(0); F.fill(0);
+    I.fill(0); F.fill(0); Z.fill(0); S.fill(0); RW.fill(0); RG.fill(0);
     const th = o.themes[o.theme];
     if (o.water) {
       for (let cy = 0; cy < rows; cy += 2) for (let cx = (cy / 2) % 3; cx < cols; cx += 3) {
@@ -423,27 +447,43 @@ export function mount(el, options = {}) {
         if (val > 0.9) put((cx + 0.5) * cw, (cy + 0.5) * chh, '.', (val - 0.9) * 0.9, 0, 2);
       }
     }
-    for (const rp of ripples) { // two ASCII rings, seen from above so they stay round
+    for (const rp of ripples) { // a packet of rings: crests catch the light (white), troughs are shadow (grey)
       const life = 1 - rp.age / o.rippleLife;
-      for (const k of [1, 0.6]) {
-        const R = rp.age * o.rippleSpeed * k + 4;
-        const n = Math.max(12, Math.ceil(TAU * R / (Math.min(cw, chh) * 0.6)));
-        for (let i = 0; i < n; i++) {
-          const a = i / n * TAU;
-          put(rp.x + Math.cos(a) * R, rp.y + Math.sin(a) * R, lineChar(-Math.sin(a), Math.cos(a)), life * 0.55 * k, 0, 3);
-        }
+      const R = rp.age * o.rippleSpeed + 6, wl = o.rippleWave, pw = wl * 1.8;
+      const reach = R + pw * 1.6;
+      const c0 = Math.max(0, Math.floor((rp.x - reach) / cw)), c1 = Math.min(cols - 1, Math.ceil((rp.x + reach) / cw));
+      const r0 = Math.max(0, Math.floor((rp.y - reach) / chh)), r1 = Math.min(rows - 1, Math.ceil((rp.y + reach) / chh));
+      for (let cy = r0; cy <= r1; cy++) for (let cx = c0; cx <= c1; cx++) {
+        const x = (cx + 0.5) * cw - rp.x, y = (cy + 0.5) * chh - rp.y, d = Math.hypot(x, y);
+        const off = d - R;
+        if (off > pw * 1.6 || off < -pw * 2.4) continue;
+        const env = Math.exp(-(off * off) / (pw * pw)) * life * Math.min(1, d / (wl * 0.8));
+        const w = Math.cos(off / wl * TAU) * env;
+        const i = cy * cols + cx;
+        if (w > 0) RW[i] = Math.max(RW[i], w); else RG[i] = Math.max(RG[i], -w);
+        if (Math.abs(w) > 0.45) put((cx + 0.5) * cw, (cy + 0.5) * chh, lineChar(-y, x), Math.abs(w) * 0.8, 0, w > 0 ? 4 : 3);
       }
     }
     for (const p of food) { put(p.x, p.y, 'o', Math.min(1, (o.foodLife - p.age) / 3), 0.42, 0, true); tile(p.x, p.y, 0.25, 0.45); }
-    for (const f of fish) f.drawFins(0);
-    for (const f of fish) f.drawBody();
-    for (const f of fish) f.drawFins(1);
+    fish.forEach((f, k) => {
+      curZ = k + 1; touched = [];
+      f.drawFins(0); f.drawBody(); f.drawFins(1);
+      castShadow(f.L);
+    });
+    curZ = 0;
 
     ctx.fillStyle = th.bg; ctx.fillRect(0, 0, W, H);
     for (let i = 0, n = cols * rows; i < n; i++) { // tiles
       const a = F[i]; if (a < 0.03) continue;
       ctx.fillStyle = FT[i] < 0 ? styles.eye : styles.ink[toneIdx(FT[i])][Math.min(9, Math.floor(a * 10))];
       ctx.fillRect((i % cols) * cw + 0.5, Math.floor(i / cols) * chh + 0.5, cw - 1, chh - 1);
+    }
+    const sh = th.shade.join(','), wd = th.waveDark.join(','), wlc = th.waveLight.join(',');
+    for (let i = 0, n = cols * rows; i < n; i++) { // shadows, then ripple troughs and crests
+      const x = (i % cols) * cw + 0.5, y = Math.floor(i / cols) * chh + 0.5;
+      if (S[i] > 0.03) { ctx.fillStyle = `rgba(${sh},${(S[i] * th.shadeA).toFixed(3)})`; ctx.fillRect(x, y, cw - 1, chh - 1); }
+      if (RG[i] > 0.04) { ctx.fillStyle = `rgba(${wd},${(RG[i] * th.waveDarkA).toFixed(3)})`; ctx.fillRect(x, y, cw - 1, chh - 1); }
+      if (RW[i] > 0.04) { ctx.fillStyle = `rgba(${wlc},${(RW[i] * th.waveLightA).toFixed(3)})`; ctx.fillRect(x, y, cw - 1, chh - 1); }
     }
     ctx.font = `${o.fontSize}px "DM Mono", ui-monospace, Menlo, monospace`;
     ctx.textBaseline = 'top';

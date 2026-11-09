@@ -21,9 +21,9 @@ const CONFIG = {
   // One colour ramp per theme: tone 0 = red, 0.45 = orange, 1 = white
   themes: {
     light: { bg: '#ffffff', stops: [[196, 40, 28], [234, 104, 36], [246, 236, 228]], eye: [16, 24, 32], glint: [255, 255, 255], ring: [150, 156, 162], speck: [16, 24, 32],
-             shade: [16, 24, 32], shadeA: 0.16, waveDark: [96, 104, 112], waveDarkA: 0.22, waveLight: [255, 255, 255], waveLightA: 0.85 },
+             finTile: 0.45, shade: [16, 24, 32], shadeA: 0.16, waveDark: [96, 104, 112], waveDarkA: 0.22, waveLight: [255, 255, 255], waveLightA: 0.85 },
     dark:  { bg: '#0c0c0d', stops: [[214, 48, 30], [244, 120, 44], [252, 244, 236]], eye: [8, 8, 9], glint: [255, 255, 255], ring: [200, 200, 204], speck: [255, 255, 255],
-             shade: [0, 0, 0], shadeA: 0.6, waveDark: [0, 0, 0], waveDarkA: 0.45, waveLight: [255, 255, 255], waveLightA: 0.3 },
+             finTile: 0.85, shade: [0, 0, 0], shadeA: 0.6, waveDark: [0, 0, 0], waveDarkA: 0.45, waveLight: [255, 255, 255], waveLightA: 0.3 },
   },
 };
 
@@ -154,7 +154,8 @@ export function mount(el, options = {}) {
     for (let s = 0; s <= n; s++) {
       const x = ax + dx * s / n, y = ay + dy * s / n;
       put(x, y, ch, inten, tone);
-      if (o.finTile > 0) tile(x, y, inten * o.finTile, tone);
+      const ft = o.themes[o.theme].finTile ?? o.finTile;
+      if (ft > 0) tile(x, y, inten * ft, tone);
     }
   }
 
@@ -187,9 +188,9 @@ export function mount(el, options = {}) {
     }
     // half body width seen from above (0 = snout, 1 = tail root): egg shape, widest ~0.35
     hw(u) {
-      const front = u < 0.32 ? 0.66 + 0.34 * Math.sin((u / 0.32) * Math.PI / 2) : 1;
-      const back = 1 - 0.8 * smooth((u - 0.42) / 0.58);
-      return this.L * 0.3 * front * back;
+      const front = u < 0.3 ? 0.7 + 0.3 * Math.sin((u / 0.3) * Math.PI / 2) : 1;
+      const back = 1 - 0.82 * Math.pow(smooth((u - 0.46) / 0.54), 0.8);
+      return this.L * 0.35 * front * back;
     }
     frame(u) { // point, forward unit vector, left unit vector at u
       const f = clamp(u, 0, 1) * (this.n - 1);
@@ -345,10 +346,16 @@ export function mount(el, options = {}) {
         const edge = e > 0.88;
         const tailFade = smooth((u - 0.85) / 0.15);
         // oranda wen: bumpy red cap over the top of the head
-        if (v.wen && u < 0.3 && e < 0.95) {
-          const bump = Math.sin(cx * 1.7 + cy * 0.9) + Math.sin(cx * 0.8 - cy * 1.9);
-          tile(x, y, 1, clamp(0.02 + (bump > 0.6 ? 0.1 : 0) + nz * 0.06, 0, 1), true);
-          put(x, y, 'o8O@&o'[Math.floor(nz * 6)], 0.9, 0, 0, true);
+        if (v.wen && u < 0.32 && e < 0.97) {
+          // hex lattice of bumps in body coordinates; each bump is lit in the middle and dark at its rim
+          const bs = Math.max(cw * 2.6, L * 0.08);
+          const gu = along / bs, gv = blat / (bs * 0.87);
+          const rowi = Math.round(gv), colf = gu - (rowi % 2 ? 0.5 : 0);
+          const r = Math.hypot(colf - Math.round(colf), (gv - rowi) * 0.87) * 2; // 0 centre … ~1.1 gap
+          const rim = smooth((u - 0.2) / 0.12);                                   // bumps fade into the body behind the head
+          if (r < 0.5) { tile(x, y, 1, clamp(0.3 + nz * 0.06 + rim * 0.1, 0, 1), true); put(x, y, nz < 0.5 ? 'o' : 'O', 0.95, 0.1, 0, true); }
+          else if (r < 0.82) { tile(x, y, 1, clamp(0.1 + rim * 0.2, 0, 1), true); put(x, y, nz < 0.4 ? '(' : nz < 0.8 ? ')' : '.', 0.9, 0, 0, true); }
+          else { tile(x, y, 0.95, 0, true); put(x, y, '.', 0.6, 0, 0, true); S[cellAt(x, y)] = Math.max(S[cellAt(x, y)], 1); }
           continue;
         }
         tile(x, y, (edge ? 0.65 : 0.95) * (1 - tailFade * 0.5), tone, true);
@@ -386,8 +393,8 @@ export function mount(el, options = {}) {
     };
     // twin tail: one lobe to each side, spreading wide; telescope tails are mostly white with a red core
     for (const side of [1, -1]) {
-      fins.push(fan({ u: 1, side, count: 18, a0: 6 * D, a1: 72 * D, off: 0.3, segs: 13,
-        len: (q) => 0.62 + 0.42 * Math.sin(q * Math.PI * 0.85), curl: (q) => 0.25 + q * 0.35, sway: 0.42, freq: 2.0,
+      fins.push(fan({ u: 1, side, count: 24, a0: 4 * D, a1: 82 * D, off: 0.36, segs: 15,
+        len: (q) => 0.9 + 0.62 * Math.sin(q * Math.PI * 0.8), curl: (q) => 0.3 + q * 0.4, sway: 0.4, freq: 1.8,
         tone0: v.tailBase, tone1: v.tailTip, toneJitter: v.tailWhite ? 0.3 : 0.12 }));
     }
     // pectoral fins

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用文字畫一隻會游的金魚 — Kailan Huang</title>
+<meta name="description" content="ASCII 金魚是怎麼做出來的：八個可以直接玩的小步驟，從一個會動的點，到一池會搶飼料的金魚。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/site.css">
+<script type="module" src="/assets/js/site.js"></script>
+<style>
+  .article { max-width: 46rem; margin: 0 auto; padding: clamp(40px, 7vw, 88px) 16px 96px; display: flex; flex-direction: column; gap: 22px; }
+  .article .back { color: var(--mute); }
+  .article .back:hover { color: var(--accent); }
+  .article h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(36px, 5.4vw, 56px); line-height: 1.1; letter-spacing: -.02em; text-wrap: balance; }
+  .article .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .article p, .article li { font-size: 17px; line-height: 1.8; }
+  .article ul, .article ol { padding-left: 1.4em; display: flex; flex-direction: column; gap: 4px; }
+  .article h2 { font-family: var(--serif); font-weight: 400; font-size: 30px; line-height: 1.2; letter-spacing: -.01em; margin-top: 36px; display: flex; gap: 14px; align-items: baseline; text-wrap: balance; }
+  .article h2 .mono { color: var(--accent); flex: none; }
+  .article code { font-family: var(--mono); font-size: .88em; background: var(--side); padding: 1px 5px; border-radius: 3px; }
+  .article pre { font-family: var(--mono); font-size: 13px; line-height: 1.65; background: var(--side); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; overflow-x: auto; }
+  .article pre code { background: none; padding: 0; font-size: inherit; }
+  .lesson { border-left: 2px solid var(--accent); padding: 4px 0 4px 16px; color: var(--ink); }
+  .lesson b { font-weight: 600; }
+  .map { font-family: var(--mono); font-size: 13px; line-height: 1.9; background: var(--side); border: 1px solid var(--line); border-radius: 4px; padding: 16px; overflow-x: auto; white-space: pre; }
+  .demo { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--bg); }
+  .demo-canvas { position: relative; height: 300px; touch-action: pan-y; cursor: crosshair; }
+  .demo-canvas canvas { display: block; }
+  .demo.tall .demo-canvas { height: 420px; }
+  .demo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--side); }
+  .demo-bar label { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .demo-bar input[type=range] { accent-color: var(--accent); width: 130px; }
+  .demo-bar input[type=checkbox] { accent-color: var(--accent); }
+  .demo-bar output { color: var(--ink); font-variant-numeric: tabular-nums; min-width: 4.5em; }
+  .demo-bar .hint { font-family: var(--mono); font-size: 12px; color: var(--mute); margin-left: auto; }
+  table.math { border-collapse: collapse; width: 100%; font-size: 15px; }
+  table.math th, table.math td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.math th { font-family: var(--mono); font-size: 12px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 600px) { .demo-bar .hint { margin-left: 0; } .demo-canvas { height: 240px; } .demo.tall .demo-canvas { height: 340px; } }
+</style>
+</head>
+<body>
+<!-- NAV: keep identical on every page (only aria-current changes) -->
+<header class="site-nav">
+  <a class="brand" href="/">Kailan Huang</a>
+  <nav><ul>
+    <li><a href="/work/">Work</a></li>
+    <li><a href="/playground/">Playground</a></li>
+    <li><a href="/notes/" aria-current="page">Notes</a></li>
+    <li><a href="/about/">About</a></li>
+  </ul></nav>
+</header>
+<main>
+<article class="article">
+  <a class="mono back" href="/notes/">← Notes</a>
+  <h1>用文字畫一隻會游的金魚</h1>
+  <div class="meta">
+    <span class="mono">2026-11-09</span>
+    <span class="mono" style="color:var(--accent)">Note · Tutorial</span>
+    <a class="mono" href="/playground/goldfish/" style="color:var(--ink)">看完整的金魚池 ↗</a>
+  </div>
+
+  <p><a href="/playground/goldfish/">ASCII 金魚</a>看起來很複雜，其實只是幾個小觀念一層一層疊上去。這篇把它拆成八步，每一步都有一個可以直接玩的小範例：滑鼠移到範例上就會跟著你，拖拖看下面的滑桿，數字一改，馬上就知道那個參數在做什麼。</p>
+
+  <p>整隻魚只有四層，由下往上疊：</p>
+  <div class="map">④ 互動    點一下 → 水波，點兩下 → 飼料
+③ 外觀    顏色、色磚、鱗片、眼睛
+② 身體    一條「脊椎」決定魚在哪、彎成什麼樣子
+① 舞台    一張字元方格紙 + 每秒重畫 60 次</div>
+  <p class="lesson"><b>最重要的一個觀念：「動」和「畫」是兩件事。</b>每一幀先算出魚現在在哪、長什麼樣子，再把結果「印」到方格紙上。這兩件事分開，程式才不會亂。</p>
+
+  <h2><span class="mono">01</span>會動的點</h2>
+  <p>網頁動畫的核心只有一個迴圈：清掉畫面、算新位置、再畫一次，一秒重複約 60 次。<code>requestAnimationFrame</code> 會在瀏覽器準備好下一幀時呼叫你的函式。</p>
+  <p>移動的距離要用「速度 × 經過的時間」來算，也就是程式裡的 <code>dt</code>。這樣不管電腦快或慢，點都用一樣的速度前進。</p>
+  <div class="demo" data-demo="step1">
+    <div class="demo-canvas" style="height:120px"></div>
+    <div class="demo-bar"><label for="s1-speed">Speed <input id="s1-speed" type="range" min="20" max="600" value="160"><output for="s1-speed"></output></label></div>
+  </div>
+  <pre><code>let last = performance.now();
+function loop(now) {
+  const dt = (now - last) / 1000;  // 兩幀之間過了幾秒
+  last = now;
+  x += speed * dt;                 // 距離 = 速度 × 時間
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);</code></pre>
+
+  <h2><span class="mono">02</span>一張字元方格紙</h2>
+  <p>把畫面切成一格一格，每一格放一個字元。每一幀先把所有格子的內容寫進一張表（陣列），最後再一次全部畫到畫面上。</p>
+  <p>這裡每一格都量一下自己離滑鼠多遠：越近，字元越「重」（<code>. : o @</code>）。改字元大小，整張紙就重新排一次。</p>
+  <div class="demo" data-demo="step2">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar"><label for="s2-size">Char size <input id="s2-size" type="range" min="8" max="24" value="12"><output for="s2-size"></output></label><span class="hint">移動滑鼠看看</span></div>
+  </div>
+  <pre><code>for (const cell of grid) {
+  const d = distance(cell, mouse);
+  cell.char = d &lt; 24 ? '@' : d &lt; 48 ? 'o' : d &lt; 76 ? ':' : '.';
+}</code></pre>
+
+  <h2><span class="mono">03</span>會跟著走的鍊條</h2>
+  <p>做一串點：第一個點（頭）追著滑鼠，其他每個點只做一件事：<b>跟著前一個點，保持固定距離</b>。不用寫任何「怎麼擺動」的程式，鍊條就會自己彎得很自然。金魚的脊椎就是這條鍊。</p>
+  <div class="demo" data-demo="step3">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="s3-seg">Gap <input id="s3-seg" type="range" min="6" max="34" value="16"><output for="s3-seg"></output></label>
+      <label for="s3-count">Points <input id="s3-count" type="range" min="3" max="30" value="12"><output for="s3-count"></output></label>
+    </div>
+  </div>
+  <pre><code>for (let i = 1; i &lt; points.length; i++) {
+  const a = points[i - 1], b = points[i];
+  const dir = normalize(b - a);      // 從前一個點指向自己
+  points[i] = a + dir * gap;         // 拉回固定距離
+}</code></pre>
+
+  <h2><span class="mono">04</span>讓鍊條長出身體</h2>
+  <p>有了脊椎，再決定「每一段有多胖」：頭圓、中間最胖、尾巴細，就是一張寬度表。接著每一格只問兩個問題：</p>
+  <ol>
+    <li>我離脊椎上的哪一點最近？那一點在身體的第幾 %？（叫它 <code>u</code>，嘴巴是 0，尾巴開始的地方是 1）</li>
+    <li>我在脊椎旁邊多遠？</li>
+  </ol>
+  <p>只要「多遠」小於那一段的寬度，這格就屬於魚身。打開下面的 <b>Show u</b>，每一格會直接顯示它的 <code>u</code>（0–9）。之後的鱗片、眼睛、肉瘤、花紋，全部都是看這兩個數字決定的。這招叫<b>局部座標</b>，是整個專案最關鍵的一招。</p>
+  <div class="demo" data-demo="step4">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="s4-fat">Fatness <input id="s4-fat" type="range" min="0.12" max="0.45" step="0.01" value="0.3"><output for="s4-fat"></output></label>
+      <label for="s4-uv"><input id="s4-uv" type="checkbox"> Show u <output for="s4-uv"></output></label>
+    </div>
+  </div>
+  <pre><code>const { u, side } = nearestPointOnSpine(cell);
+if (side &lt; width(u)) cell.char = '*';   // 在身體裡面</code></pre>
+
+  <h2><span class="mono">05</span>讓魚自己游</h2>
+  <p>不再追滑鼠了：魚每次挑一個隨機的目標點（畫面上的 <code>x</code>），游過去，到了再挑下一個。重點是<b>轉彎速度有上限</b>。「想去哪」和「實際怎麼轉」是兩回事，限制轉彎速度，動作才會像生物。</p>
+  <p>第二個滑桿是我們真的踩過的坑：鍊條每一節最多能彎幾度。把 <b>Max bend</b> 拉到最大、<b>Turn</b> 也拉高，看魚急轉彎時身體會從中間「折斷」。金魚很胖，彎得太急，內側的格子就分不清屬於前段還是後段。把每節限制在幾度以內，就修好了。</p>
+  <div class="demo" data-demo="step5">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="s5-turn">Turn <input id="s5-turn" type="range" min="0.4" max="8" step="0.1" value="1.6"><output for="s5-turn"></output></label>
+      <label for="s5-bend">Max bend <input id="s5-bend" type="range" min="2" max="60" value="8"><output for="s5-bend"></output></label>
+    </div>
+  </div>
+  <pre><code>const want = angleTo(target);
+angle += clamp(want - angle, -turnSpeed * dt, turnSpeed * dt);  // 一次只轉一點點</code></pre>
+
+  <h2><span class="mono">06</span>鰭和尾巴：慢半拍的線</h2>
+  <p>尾巴是很多條小鍊條，根部黏在身上。每條線的每一點，都朝「它該在的位置」移動，但<b>越往末端越慢半拍</b>，飄逸感就是這樣來的。畫的時候，看每一小段線往哪個方向，就挑 <code>- / | \</code> 其中一個字元。</p>
+  <p>試試把 <b>Rigid root</b> 關掉：根部也開始慢半拍，魚一轉彎，整片尾巴就被甩離身體。這也是我們實際遇到的 bug：<b>哪些地方要硬接、哪些地方可以飄</b>，要分清楚。</p>
+  <div class="demo" data-demo="step6">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="s6-lag">Follow <input id="s6-lag" type="range" min="0.04" max="1" step="0.01" value="0.35"><output for="s6-lag"></output></label>
+      <label for="s6-rigid"><input id="s6-rigid" type="checkbox" checked> Rigid root <output for="s6-rigid"></output></label>
+      <span class="hint">Follow 越小，尾巴越飄</span>
+    </div>
+  </div>
+  <pre><code>const follow = rootIsRigid &amp;&amp; nearRoot ? 1 : lag * (1 - 0.7 * q);  // q：0 根部 → 1 末端
+p.x += (target.x - p.x) * follow;</code></pre>
+
+  <h2><span class="mono">07</span>上色：一條漸層、一層色磚</h2>
+  <p>顏色只用一條漸層：紅 → 橘 → 白。每一格只要記一個 0 到 1 的數字，代表在漸層上的位置；換主題的時候，只要換掉這條漸層。</p>
+  <p>身體每一格先墊一塊<b>色磚</b>，字元用深一點的同色畫在上面；鱗片就是交錯排列的 <code>(((</code>。把下面兩個開關切來切去，看看各自負責什麼。</p>
+  <div class="demo" data-demo="step7">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="s7-tiles"><input id="s7-tiles" type="checkbox" checked> Tiles <output for="s7-tiles"></output></label>
+      <label for="s7-scales"><input id="s7-scales" type="checkbox" checked> Scales <output for="s7-scales"></output></label>
+    </div>
+  </div>
+
+  <h2><span class="mono">08</span>互動和氣氛</h2>
+  <p>最後一層：點一下，用 <code>cos</code> 做出一圈亮、一圈暗往外擴散的水波；點兩下撒飼料，魚的目標從隨機點換成最近的飼料。每隻魚再往右下方複製一份淡灰的自己，就是陰影。下面就是完整的金魚池，點點看。</p>
+  <div class="demo tall" data-demo="step8">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar"><span class="hint" style="margin-left:0">點一下：水波 · 點兩下：撒飼料</span></div>
+  </div>
+
+  <h2><span class="mono">+</span>會用到的數學</h2>
+  <p>只要這幾個，而且不用先學完，遇到再學就好：</p>
+  <div class="table-wrap"><table class="math">
+    <thead><tr><th>工具</th><th>白話</th><th>在哪用</th></tr></thead>
+    <tbody>
+      <tr><td><code>(x, y)</code> 向量</td><td>一個方向加一段距離</td><td>魚往哪游</td></tr>
+      <tr><td><code>Math.atan2</code></td><td>從方向算出角度</td><td>轉向、挑線條字元</td></tr>
+      <tr><td><code>cos</code> / <code>sin</code></td><td>從角度算回方向；也能做規律的波動</td><td>擺尾、水波</td></tr>
+      <tr><td>lerp</td><td>從 A 慢慢靠近 B</td><td>速度變化、鰭慢半拍</td></tr>
+      <tr><td>smoothstep</td><td>讓變化的頭尾都很柔和</td><td>身體輪廓、淡出</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="mono">+</span>從 bug 學到的三件事</h2>
+  <ol>
+    <li><b>魚身骨折</b>：鍊條可以彎太急 → 學會「限制條件」，每一節最多彎幾度。</li>
+    <li><b>尾巴跟身體分開</b>：根部也在慢半拍 → 分清楚哪些要硬接、哪些可以飄。</li>
+    <li><b>尾柄看起來重複</b>：身體、補丁、尾巴三套東西畫在同一個地方 → 一個區域只讓一個系統負責。最後的解法是身體只畫前 3/4，剩下的交給尾巴。</li>
+  </ol>
+  <p class="lesson">兩個除錯小習慣：做一個<b>「暫停模式」</b>，讓魚停住，才看得清楚形狀；還有<b>用數字確認，不要只靠眼睛</b>。我一度以為魚不吃飼料，量了牠們的位置才發現其實沒問題。</p>
+
+  <p>完整的程式碼在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/assets/js/effects/goldfish.js" target="_blank" rel="noopener" style="text-decoration:underline">GitHub ↗</a>，這篇的範例在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/notes/2026-11-09-ascii-goldfish/demos.js" target="_blank" rel="noopener" style="text-decoration:underline">demos.js ↗</a>。</p>
+</article>
+</main>
+<!-- FOOTER: keep identical on every page -->
+<footer class="site-foot">
+  <span class="mono">© 2026 Kailan Huang</span>
+  <a class="mono email" href="mailto:kailanxh@gmail.com">kailanxh@gmail.com</a>
+  <a class="mono" href="/assets/kailan-huang-cv.pdf">Download CV</a>
+</footer>
+<script type="module" src="./demos.js"></script>
+</body>
+</html>

@@ -1,6 +1,18 @@
 [
   {
     "date": "2026-11-09",
+    "type": "note",
+    "title": "用文字畫一隻會游的金魚",
+    "excerpt": "ASCII 金魚是怎麼做出來的：八個可以直接玩的小步驟，從一個會動的點，到一池會搶飼料的金魚。",
+    "tags": [
+      "ASCII",
+      "Interaction",
+      "Process"
+    ],
+    "link": "/notes/2026-11-09-ascii-goldfish/"
+  },
+  {
+    "date": "2026-11-09",
     "type": "update",
     "title": "Playground experiments now have notes and references",
     "tags": []

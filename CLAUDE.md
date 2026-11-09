@@ -12,7 +12,7 @@ Talk to Kailan in Traditional Chinese (台灣用語). Site copy is mixed Chinese
 - Pages: `/` (one-screen landing), `/work/`, `/playground/`, `/notes/`, `/about/`.
 - Shared styles: `assets/css/site.css`. Shared script: `assets/js/site.js`.
 - **Content is data, not markup.** Lists are generated from JSON:
-  - `data/experiments.json` → Playground grid + tag filters
+  - `data/experiments.json` → Playground grid + tag filters; each item's `notes` / `refs` feed the Notes drawer on its page
   - `data/notes.json` → Notes list (types: `note`, `reading`, `update`)
   - `data/works.json` → Work grid + category filters
   Adding content = editing JSON (plus files for the item). Do not hand-edit the generated sections in HTML.

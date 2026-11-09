@@ -50,9 +50,21 @@ Add to the top of `data/experiments.json`:
   "label": "New",
   "link": "/playground/music-particles/",
   "thumb": "/playground/music-particles/thumb.png",
-  "how": "optional — link to a Notes entry or external write-up about how it was made"
+  "how": "optional — link to a Notes entry or external write-up about how it was made",
+  "notes": "Kailan's own notes, mixed Chinese/English. Paragraphs separated by a blank line (\n\n).",
+  "refs": [
+    { "label": "Site or work that inspired it", "url": "https://…" },
+    { "label": "Reference without a link", "note": "what it was used for" }
+  ]
 }
 ```
+
+- `notes` and `refs` show in a Notes drawer on the experiment page (`assets/js/exp-notes.js`, opened by the
+  page's Notes button or `#notes` in the URL) and add a Notes button to the Playground card.
+- Notes are Kailan's voice: use their words; if you draft from the conversation, say so and ask them to edit.
+- Refs: always credit references Kailan showed you. Use a `url` only for public pages; never link to private files.
+- Every hosted experiment page must include `<script type="module" src="/assets/js/exp-notes.js"></script>`
+  before `</body>`, and its top bar needs the class `bar top` with a `/playground/` link (the Notes button goes before it).
 
 - Tags: reuse existing tags from `data/experiments.json`, `data/notes.json`, `data/works.json` first (see CLAUDE.md).
 - Set `label: "New"` on the new item and remove `New` from items older than ~30 days.

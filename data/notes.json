@@ -1,5 +1,20 @@
 [
   {
+    "date": "2026-11-09",
+    "type": "update",
+    "title": "Playground experiments now have notes and references",
+    "tags": []
+  },
+  {
+    "date": "2026-11-09",
+    "type": "update",
+    "title": "Added experiment: ASCII Goldfish",
+    "link": "/playground/goldfish/",
+    "tags": [
+      "AI"
+    ]
+  },
+  {
     "date": "2026-11-08",
     "type": "update",
     "title": "Site v2 is live — new Playground, Notes and About pages",
@@ -10,6 +25,8 @@
     "type": "update",
     "title": "Added experiment: Dot Field",
     "link": "/playground/dot-field/",
-    "tags": ["AI"]
+    "tags": [
+      "AI"
+    ]
   }
 ]

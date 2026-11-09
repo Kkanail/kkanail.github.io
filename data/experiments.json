@@ -1,12 +1,56 @@
 [
   {
+    "slug": "goldfish",
+    "title": "ASCII Goldfish",
+    "date": "2026-11-09",
+    "description": "A pond of fancy goldfish seen from above, drawn on a character grid. Click for ripples, double-click to feed.",
+    "tags": [
+      "AI",
+      "Interaction",
+      "Canvas",
+      "ASCII"
+    ],
+    "label": "New",
+    "link": "/playground/goldfish/",
+    "thumb": "/playground/goldfish/thumb.png",
+    "notes": "從 daoho.dev 的 ASCII 錦鯉池出發，想做成我自己的金魚版本。第一版是側面的線稿金魚，鰭和尾巴用一條條字元畫成髮絲；但側面的魚轉身要翻面，游起來很亂，最後改成從上往下看。\n\n上視角裡有三隻：獅頭（頭上的肉瘤是一顆顆凸起的色磚）、紅白出目金（眼睛凸在兩側）、琉金。身體用 daoho 那種有底色的格子，鰭和尾巴維持線條，下面墊淡淡的格子。\n\n後來加了陰影（光從左上來，交疊時影子會落在下面那隻魚身上），還有亮暗相間的水波反光。可以切白底和黑底，也能拖滑桿改字元大小。",
+    "refs": [
+      {
+        "label": "daoho.dev — ASCII koi pond",
+        "url": "https://www.daoho.dev/"
+      },
+      {
+        "label": "daoho on X — pond demo",
+        "url": "https://x.com/daoho04/status/2114490773043388518"
+      },
+      {
+        "label": "Marina Budarina — Create Daily (koi)",
+        "url": "https://marinabudarina.github.io/koi/"
+      },
+      {
+        "label": "Line-art goldfish illustration",
+        "note": "Fin and tail strands as fine flowing lines"
+      },
+      {
+        "label": "Kamihata Fish Industries — goldfish photos",
+        "note": "Top-view reference for the oranda and the red-and-white telescope"
+      }
+    ]
+  },
+  {
     "slug": "dot-field",
     "title": "Dot Field",
     "date": "2026-11-08",
     "description": "A mouse-reactive dot grid — dots swell, drift away and turn purple near your cursor. Built with Claude; it also lives on my homepage.",
-    "tags": ["AI", "Interaction", "Canvas"],
+    "tags": [
+      "AI",
+      "Interaction",
+      "Canvas"
+    ],
     "label": "New",
     "link": "/playground/dot-field/",
-    "thumb": "/playground/dot-field/thumb.png"
+    "thumb": "/playground/dot-field/thumb.png",
+    "notes": "首頁左邊的互動區塊。滑鼠靠近時，附近的點會變大、被推開、染成紫色；沒有滑鼠時，會有一個看不見的游標自己慢慢飄，手機上也不會是死的。\n\n它是一個可以替換的插槽：所有首頁效果都照同一個 mount(el) 格式寫，之後換效果不用動網站其他地方。",
+    "refs": []
   }
 ]

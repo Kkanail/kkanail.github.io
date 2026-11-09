@@ -67,6 +67,7 @@ async function renderPlayground() {
       <div class="actions">
         <a class="btn primary small" href="${esc(it.link)}"${target}>Try it ↗</a>
         ${it.how ? `<a class="btn small" href="${esc(it.how)}"${isExternal(it.how) ? ' target="_blank" rel="noopener"' : ''}>How I made it</a>` : ''}
+        ${(it.notes || (it.refs || []).length) && !ext ? `<a class="btn small" href="${esc(it.link)}#notes">Notes</a>` : ''}
       </div>
     </article>`;
   };

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASCII Goldfish — Playground — Kailan Huang</title>
+<meta name="description" content="Line-art goldfish drawn with characters. Click for ripples, double-click to feed.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #ffffff; --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --panel: #ffffff; --accent: #6e56cf; }
+  [data-theme="dark"] { --bg: #0c0c0d; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #141415; --accent: #ffb27a; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; transition: background .3s; }
+  #pond { position: fixed; inset: 0; cursor: crosshair; }
+  #pond canvas { position: absolute; inset: 0; }
+  .bar {
+    position: fixed; left: 16px; right: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    font: 12px/1.4 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute);
+    pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .top { top: 16px; }
+  .top h1 { font: 400 24px/1 "Newsreader", Georgia, serif; letter-spacing: -.01em; text-transform: none; color: var(--ink); margin-right: auto; }
+  .top a { color: var(--ink); text-decoration: none; }
+  .top a:hover { color: var(--accent); }
+  .controls { bottom: 16px; }
+  .group { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+  button { font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--ink); background: none; border: 0; cursor: pointer; padding: 4px 6px; }
+  button:hover { color: var(--accent); }
+  input[type=range] { accent-color: var(--accent); width: 120px; }
+  output { color: var(--ink); min-width: 2.5em; text-align: right; }
+  .hint { margin-left: auto; }
+  @media (max-width: 600px) { .hint { display: none; } .group { padding: 4px 10px; } input[type=range] { width: 90px; } }
+</style>
+</head>
+<body>
+<div id="pond"></div>
+<div class="bar top">
+  <h1>ASCII Goldfish</h1>
+  <a href="/playground/">← Playground</a>
+</div>
+<div class="bar controls">
+  <div class="group"><button id="theme" aria-label="Toggle light or dark">◐ Dark</button></div>
+  <div class="group" aria-label="Number of fish">
+    <button id="less" aria-label="Fewer fish">−</button><span><b id="count" style="font-weight:400;color:var(--ink)">3</b> fish</span><button id="more" aria-label="More fish">+</button>
+  </div>
+  <label class="group">Char size <input id="size" type="range" min="6" max="24" step="1" value="11"><output id="sizeOut">11px</output></label>
+  <span class="hint">Click: ripple · Double-click: feed</span>
+</div>
+<script type="module">
+  import { mount } from '/assets/js/effects/goldfish.js';
+  const root = document.documentElement;
+  const params = new URLSearchParams(location.search);
+  const pond = mount(document.getElementById('pond'), { theme: 'light', count: 3, fontSize: 11, still: params.has('still') });
+  const themeBtn = document.getElementById('theme');
+  themeBtn.addEventListener('click', () => {
+    const next = pond.getState().theme === 'light' ? 'dark' : 'light';
+    pond.setTheme(next); root.dataset.theme = next;
+    themeBtn.textContent = next === 'light' ? '◐ Dark' : '◑ Light';
+  });
+  const count = document.getElementById('count');
+  document.getElementById('less').addEventListener('click', () => { count.textContent = pond.setCount(pond.getState().count - 1); });
+  document.getElementById('more').addEventListener('click', () => { count.textContent = pond.setCount(pond.getState().count + 1); });
+  const size = document.getElementById('size'), out = document.getElementById('sizeOut');
+  size.addEventListener('input', () => { pond.setFontSize(Number(size.value)); out.textContent = size.value + 'px'; });
+</script>
+</body>
+</html>

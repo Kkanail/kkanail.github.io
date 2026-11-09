@@ -394,7 +394,7 @@ export function mount(el, options = {}) {
     // twin tail: one lobe to each side, spreading wide; telescope tails are mostly white with a red core
     for (const side of [1, -1]) {
       fins.push(fan({ u: 1, side, count: 24, a0: 4 * D, a1: 82 * D, off: 0.36, segs: 15,
-        len: (q) => 0.9 + 0.62 * Math.sin(q * Math.PI * 0.8), curl: (q) => 0.3 + q * 0.4, sway: 0.4, freq: 1.8,
+        len: (q) => (0.9 + 0.62 * Math.sin(q * Math.PI * 0.8)) * 0.8, curl: (q) => 0.3 + q * 0.4, sway: 0.4, freq: 1.8, // tail length scaled to 0.8
         tone0: v.tailBase, tone1: v.tailTip, toneJitter: v.tailWhite ? 0.3 : 0.12 }));
     }
     // pectoral fins

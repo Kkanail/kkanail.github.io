@@ -275,8 +275,11 @@ export function mount(el, options = {}) {
             const tx = s.p[k - 1].x + bx * s.seg, ty = s.p[k - 1].y + by * s.seg;
             const st = init || q < 0.3 ? 1 : Math.min(1, (0.5 - 0.38 * q) * dt * 60); // root stays attached, tips trail
             s.p[k].x += (tx - s.p[k].x) * st; s.p[k].y += (ty - s.p[k].y) * st;
-            const dx = s.p[k].x - s.p[k - 1].x, dy = s.p[k].y - s.p[k - 1].y, l = Math.hypot(dx, dy) || 1;
-            s.p[k].x = s.p[k - 1].x + dx / l * s.seg; s.p[k].y = s.p[k - 1].y + dy / l * s.seg;
+            // keep the strand inside its fan: never folded forward along the body, never crossing to the other side
+            const dx = s.p[k].x - s.p[k - 1].x, dy = s.p[k].y - s.p[k - 1].y;
+            const back = Math.atan2(-fr.fy, -fr.fx);
+            const rel = clamp(wrap(Math.atan2(dy, dx) - back) * fin.side, fin.minA, fin.maxA) * fin.side;
+            s.p[k].x = s.p[k - 1].x + Math.cos(back + rel) * s.seg; s.p[k].y = s.p[k - 1].y + Math.sin(back + rel) * s.seg;
           }
         }
       }
@@ -402,12 +405,13 @@ export function mount(el, options = {}) {
           off: (opts.off || 0) * (q - 0.5), tj: (Math.random() - 0.5) * (opts.toneJitter || 0.1), p });
       }
       return { u: opts.u, v: opts.v || 0, side: opts.side || 1, layer: opts.layer || 0, sway: opts.sway, freq: opts.freq,
+        maxA: opts.maxA ?? 2.2, minA: opts.minA ?? -2.2,
         inten: opts.inten ?? 1, tone0: opts.tone0, tone1: opts.tone1, strands };
     };
     // twin tail: one lobe to each side, spreading wide; telescope tails are mostly white with a red core
     for (const side of [1, -1]) {
-      fins.push(fan({ u: 1, side, count: 24, a0: 4 * D, a1: 82 * D, off: 0.36, segs: 15,
-        len: (q) => (0.9 + 0.62 * Math.sin(q * Math.PI * 0.8)) * 0.8, curl: (q) => 0.3 + q * 0.4, sway: 0.4, freq: 1.8, // tail length scaled to 0.8
+      fins.push(fan({ u: 1, side, count: 24, a0: 4 * D, a1: 70 * D, off: 0.36, segs: 15, maxA: 92 * D, minA: -12 * D,
+        len: (q) => (0.9 + 0.62 * Math.sin(q * Math.PI * 0.8)) * 0.8, curl: (q) => 0.12 + q * 0.25, sway: 0.32, freq: 1.8, // tail length scaled to 0.8
         tone0: v.tailBase, tone1: v.tailTip, toneJitter: v.tailWhite ? 0.3 : 0.12 }));
     }
     // pectoral fins
@@ -547,6 +551,11 @@ export function mount(el, options = {}) {
   cleanup.setCount = (n) => { o.count = clamp(Math.round(n), 1, o.maxCount); syncCount(); if (reduce) draw(); return o.count; };
   cleanup.setFontSize = (px) => { o.fontSize = clamp(px, 6, 28); layout(); };
   cleanup.getState = () => ({ theme: o.theme, count: o.count, fontSize: o.fontSize,
-    fish: fish.map((f) => ({ x: Math.round(f.spine[0].x), y: Math.round(f.spine[0].y), flee: +f.flee.toFixed(2), speed: Math.round(f.speed) })), food: food.length, size: [Math.round(W), Math.round(H)] });
+    fish: fish.map((f) => ({ x: Math.round(f.spine[0].x), y: Math.round(f.spine[0].y), flee: +f.flee.toFixed(2), speed: Math.round(f.speed) })), food: food.length, size: [Math.round(W), Math.round(H)],
+    // widest tail-strand angle from straight back, in degrees (for checking the tail never folds forward)
+    tailMaxDeg: Math.round(Math.max(0, ...fish.flatMap((f) => f.fins.filter((fn) => fn.u === 1).flatMap((fn) => {
+      const fr = f.frame(1), back = Math.atan2(-fr.fy, -fr.fx);
+      return fn.strands.flatMap((st) => st.p.slice(1).map((pt, k) => Math.abs(wrap(Math.atan2(pt.y - st.p[k].y, pt.x - st.p[k].x) - back)) * 180 / Math.PI));
+    })))) });
   return cleanup;
 }

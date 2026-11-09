@@ -251,7 +251,7 @@ export function mount(el, options = {}) {
           const pr = this.spine[i - 2];
           const prev = Math.atan2(a.y - pr.y, a.x - pr.x);
           const q = i / (this.n - 1);
-          const maxBend = 0.05 + 0.17 * q * q; // ~3° per joint at the head, ~12° near the tail
+          const maxBend = 0.03 + 0.11 * q * q; // ~2° per joint at the head, ~8° near the tail; whole body bends ≤ ~45°
           ang = prev + clamp(wrap(ang - prev), -maxBend, maxBend);
         }
         b.x = a.x + Math.cos(ang) * this.seg; b.y = a.y + Math.sin(ang) * this.seg;

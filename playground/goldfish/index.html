@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
 <style>
   :root { --bg: #ffffff; --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --panel: #ffffff; --accent: #6e56cf; }
   [data-theme="dark"] { --bg: #0c0c0d; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #141415; --accent: #ffb27a; }
@@ -22,7 +23,6 @@
   }
   .bar > * { pointer-events: auto; }
   .top { top: 16px; }
-  .top h1 { font: 400 24px/1 "Newsreader", Georgia, serif; letter-spacing: -.01em; text-transform: none; color: var(--ink); margin-right: auto; }
   .top a { color: var(--ink); text-decoration: none; }
   .top a:hover { color: var(--accent); }
   .controls { bottom: 16px; }
@@ -38,8 +38,11 @@
 <body>
 <div id="pond"></div>
 <div class="bar top">
-  <h1>ASCII Goldfish</h1>
-  <a href="/playground/">← Playground</a>
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <h1 class="crumb-here">ASCII Goldfish</h1>
+  </nav>
 </div>
 <div class="bar controls">
   <div class="group"><button id="theme" aria-label="Toggle light or dark">◐ Dark</button></div>

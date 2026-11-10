@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 <script type="importmap">{ "imports": { "three": "/assets/vendor/three/three.module.min.js" } }</script>
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
 <style>
   :root { --bg: #ffffff; --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --panel: #ffffff; --accent: #6e56cf; }
   [data-theme="dark"] { --bg: #0c0c0d; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #141415; --accent: #b9a8ff; }
@@ -26,7 +27,6 @@
 
   .bar { position: fixed; left: 16px; right: 16px; top: 16px; z-index: 3; display: flex; align-items: center; gap: 16px; pointer-events: none; }
   .bar > * { pointer-events: auto; }
-  .bar h2 { font: 400 24px/1 "Newsreader", Georgia, serif; letter-spacing: -.01em; margin-right: auto; }
   .bar a { color: var(--ink); text-decoration: none; }
   .bar a:hover { color: var(--accent); }
 
@@ -86,8 +86,11 @@
 </div>
 
 <div class="bar top">
-  <h2>Glass K</h2>
-  <a class="mono" href="/playground/">← Playground</a>
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <span class="crumb-here">Glass K</span>
+  </nav>
 </div>
 
 <aside class="panel" id="panel" aria-label="Glass K settings" data-no-poke>

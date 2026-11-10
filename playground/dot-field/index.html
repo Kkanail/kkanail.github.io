@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
 <style>
   :root { --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --accent: #6e56cf; }
   * { box-sizing: border-box; margin: 0; }
@@ -21,7 +22,6 @@
   }
   .bar > * { pointer-events: auto; }
   .top { top: 16px; }
-  .top h1 { font: 400 24px/1 "Newsreader", Georgia, serif; letter-spacing: -.01em; text-transform: none; color: var(--ink); margin-right: auto; }
   .top a { color: var(--ink); text-decoration: none; }
   .top a:hover { color: var(--accent); }
   .panel {
@@ -35,8 +35,11 @@
 <body>
 <div id="stage"></div>
 <div class="bar top">
-  <h1>Dot Field</h1>
-  <a href="/playground/">← Playground</a>
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <h1 class="crumb-here">Dot Field</h1>
+  </nav>
 </div>
 <form class="bar panel" id="panel" aria-label="Dot field settings">
   <label for="gap">Gap</label><input id="gap" type="range" min="14" max="48" value="28"><output for="gap"></output>

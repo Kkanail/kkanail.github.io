@@ -26,8 +26,7 @@ Don't ask about tags, label, slug or date — choose them yourself.
 
 - `slug`: short kebab-case English, e.g. `music-particles`.
 - Hosted experiments go in `playground/<slug>/index.html`. Make the page self-contained (inline CSS/JS or files in the
-  same folder), white background, and add a small top bar with the title (Newsreader) and a `← Playground` link
-  to `/playground/` — copy the bar from `playground/dot-field/index.html`.
+  same folder), white background, and add the breadcrumb top bar (Kailan Huang / Playground / title) — copy it from `playground/goldfish/index.html`.
 - Never load secrets or API keys in client code. If an experiment needs an API key, stop and tell Kailan.
 
 ## 3. Thumbnail
@@ -64,7 +63,9 @@ Add to the top of `data/experiments.json`:
 - Notes are Kailan's voice: use their words; if you draft from the conversation, say so and ask them to edit.
 - Refs: always credit references Kailan showed you. Use a `url` only for public pages; never link to private files.
 - Every hosted experiment page must include `<script type="module" src="/assets/js/exp-notes.js"></script>`
-  before `</body>`, and its top bar needs the class `bar top` with a `/playground/` link (the Notes button goes before it).
+  before `</body>`, and a fixed top bar `<div class="bar top">` holding the breadcrumb from `/assets/css/exp-bar.css`
+  (Kailan Huang → / , Playground → /playground/, then the title). Copy the bar from `playground/goldfish/index.html`.
+  The Notes button is appended at the right end of that bar.
 
 - Tags: reuse existing tags from `data/experiments.json`, `data/notes.json`, `data/works.json` first (see CLAUDE.md).
 - Set `label: "New"` on the new item and remove `New` from items older than ~30 days.

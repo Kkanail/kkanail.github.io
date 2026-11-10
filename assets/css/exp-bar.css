@@ -1,0 +1,31 @@
+/* Top bar for experiment pages: breadcrumb back to the homepage and the Playground.
+   Markup (inside the page's fixed `.bar.top`):
+   <nav class="crumbs" aria-label="Breadcrumb">
+     <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+     <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+     <h1 class="crumb-here">Experiment title</h1>
+   </nav>
+   Uses the page's own --ink / --mute / --accent tokens, so it follows light and dark experiment themes. */
+
+.crumbs { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-right: auto; min-width: 0; }
+.crumbs a { color: var(--ink, #101820); text-decoration: none; }
+.crumbs a:hover { color: var(--accent, #6e56cf); }
+.crumbs a:focus-visible { outline: 2px solid var(--accent, #6e56cf); outline-offset: 3px; border-radius: 2px; }
+.crumb-home, .crumb-here {
+  font: 400 22px/1.1 "Newsreader", "Noto Serif TC", Georgia, serif; letter-spacing: -.01em; text-transform: none; margin: 0;
+}
+.crumb-here { color: var(--ink, #101820); }
+.crumb-link, .crumb-sep {
+  font: 12px/1.4 "DM Mono", ui-monospace, Menlo, monospace; letter-spacing: .06em; text-transform: uppercase;
+}
+.crumb-sep { color: var(--mute, #6b6f76); }
+.crumb-link { color: var(--mute, #6b6f76) !important; }
+.crumb-link:hover { color: var(--accent, #6e56cf) !important; }
+@media (max-width: 520px) {
+  .crumb-home, .crumb-here { font-size: 19px; }
+}
+
+/* keep the Notes button at the top right; let the breadcrumb wrap instead of pushing it to a new line */
+.bar.top { flex-wrap: nowrap; align-items: flex-start; }
+.bar.top .crumbs { flex: 1; }
+.bar.top > :not(.crumbs) { flex: none; margin-top: 4px; }

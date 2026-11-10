@@ -52,7 +52,7 @@ async function init() {
   const btn = document.createElement('button');
   btn.className = 'xn-btn'; btn.type = 'button'; btn.textContent = 'Notes'; btn.setAttribute('aria-controls', 'notes'); btn.setAttribute('aria-expanded', 'false');
   const bar = document.querySelector('.bar.top, header');
-  if (bar) bar.insertBefore(btn, bar.querySelector('a[href="/playground/"]')); else document.body.appendChild(btn);
+  if (bar) bar.appendChild(btn); else document.body.appendChild(btn); // right end of the top bar
 
   const open = (on) => {
     if (on) { panel.hidden = false; requestAnimationFrame(() => panel.classList.add('open')); }

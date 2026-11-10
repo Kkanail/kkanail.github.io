@@ -1,6 +1,15 @@
 [
   {
     "date": "2026-11-10",
+    "type": "note",
+    "title": "就是想做做看 Pinterest 上被洗到的潮東西！",
+    "tags": [
+      "Life"
+    ],
+    "link": "/playground/glass-k/"
+  },
+  {
+    "date": "2026-11-10",
     "type": "update",
     "title": "Added experiment: Glass K",
     "link": "/playground/glass-k/",

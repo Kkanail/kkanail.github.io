@@ -1,5 +1,41 @@
 [
   {
+    "slug": "glass-k",
+    "title": "Glass K",
+    "date": "2026-11-10",
+    "description": "A glass letter K over my homepage heading. Hover to poke the liquid glass; pick a typeface and tune refraction, rainbow and ripples.",
+    "tags": [
+      "Interaction",
+      "WebGL",
+      "Typography"
+    ],
+    "label": "New",
+    "link": "/playground/glass-k/",
+    "thumb": "/playground/glass-k/thumb.png",
+    "notes": "想在首頁放一個透明的玻璃 K，透過它看我的自介標題。標題會先畫進 3D 場景，所以玻璃的折射和邊緣的彩虹色散都是真的光學模擬，不是貼圖。\n\n滑過 K 時，表面像液體被戳到一樣泛起漣漪；點一下會有更大的波紋，K 也會像果凍一樣彈一下。這頁是調參數用的實驗台：選字體、調折射和彩虹、波紋大小和速度、果凍感，還能切黑底。調到喜歡的樣子按 Copy settings，就能套回首頁。",
+    "refs": [
+      {
+        "label": "Panter Vision — glass type poster",
+        "note": "Glass letter over big poster type (shared on social media)"
+      },
+      {
+        "label": "Marina Budarina — Create Daily (koi)",
+        "url": "https://marinabudarina.github.io/koi/",
+        "note": "The liquid ripple on click"
+      },
+      {
+        "label": "three.js",
+        "url": "https://threejs.org/",
+        "note": "MeshPhysicalMaterial transmission and dispersion"
+      },
+      {
+        "label": "Fontsource (OFL fonts)",
+        "url": "https://fontsource.org/",
+        "note": "K outlines: Archivo Black, Anton, Playfair Display, Newsreader, Instrument Serif, Unbounded, DM Mono"
+      }
+    ]
+  },
+  {
     "slug": "goldfish",
     "title": "ASCII Goldfish",
     "date": "2026-11-09",

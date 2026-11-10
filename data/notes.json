@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-11-10",
+    "type": "update",
+    "title": "Added experiment: Glass K",
+    "link": "/playground/glass-k/",
+    "tags": [
+      "Interaction"
+    ]
+  },
+  {
     "date": "2026-11-09",
     "type": "note",
     "title": "今天實現了夢想的金魚 🐟",

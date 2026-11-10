@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glass K — Playground — Kailan Huang</title>
+<meta name="description" content="A glass letter K over a heading. Hover to poke the liquid glass; pick a typeface and tune refraction, rainbow and ripples.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<script type="importmap">{ "imports": { "three": "/assets/vendor/three/three.module.min.js" } }</script>
+<style>
+  :root { --bg: #ffffff; --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --panel: #ffffff; --accent: #6e56cf; }
+  [data-theme="dark"] { --bg: #0c0c0d; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #141415; --accent: #b9a8ff; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; transition: background .3s, color .3s; }
+  body { font: 15px/1.5 "Open Sans", -apple-system, sans-serif; }
+  .mono { font: 12px/1.4 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+
+  /* stage: the glass fills it; the heading sits on top (its glyphs are painted into the 3D scene) */
+  #stage { position: fixed; inset: 0; }
+  .copy { position: fixed; left: clamp(16px, 5vw, 72px); top: 50%; transform: translateY(-50%); z-index: 1; pointer-events: none;
+          display: flex; flex-direction: column; gap: 20px; max-width: calc(100% - 32px); }
+  .copy h1 { font-family: "Newsreader", Georgia, serif; font-weight: 400; font-size: clamp(44px, 7.2vw, 124px); line-height: .98; letter-spacing: -.03em; max-width: 9.5em; }
+  .glass-k-on .copy h1 { color: transparent; }
+
+  .bar { position: fixed; left: 16px; right: 16px; top: 16px; z-index: 3; display: flex; align-items: center; gap: 16px; pointer-events: none; }
+  .bar > * { pointer-events: auto; }
+  .bar h2 { font: 400 24px/1 "Newsreader", Georgia, serif; letter-spacing: -.01em; margin-right: auto; }
+  .bar a { color: var(--ink); text-decoration: none; }
+  .bar a:hover { color: var(--accent); }
+
+  /* control panel */
+  .panel { position: fixed; right: 16px; top: 64px; bottom: 16px; width: 300px; z-index: 3; overflow-y: auto;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+  .panel h3 { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 400; margin-bottom: 10px; }
+  .fonts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .fonts button { border: 1px solid var(--line); background: none; color: var(--ink); border-radius: 4px; padding: 8px 6px 6px; cursor: pointer;
+                  display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .fonts button canvas { width: 40px; height: 40px; }
+  .fonts button span { font: 10px "DM Mono", ui-monospace, monospace; letter-spacing: .04em; color: var(--mute); text-align: center; }
+  .fonts button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .fonts button:hover { border-color: var(--ink); }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+  .row + .row { margin-top: 12px; }
+  .row label { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .row output { font: 12px "DM Mono", ui-monospace, monospace; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); cursor: pointer; }
+  .switch input { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .2s; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .switch input:checked { background: var(--accent); }
+  .switch input:checked::after { transform: translateX(16px); }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+  .actions button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+                    background: none; color: var(--ink); border-radius: 999px; padding: 9px 10px; cursor: pointer; }
+  .actions button:hover { border-color: var(--ink); }
+  .actions .primary { grid-column: 1 / -1; background: var(--accent); border-color: var(--accent); color: #fff; }
+  [data-theme="dark"] .actions .primary { color: #141415; }
+  .copied { font: 12px "DM Mono", ui-monospace, monospace; color: var(--accent); min-height: 1.4em; text-align: center; }
+  textarea.settings { width: 100%; font: 11px/1.5 "DM Mono", ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .toggle-panel { display: none; }
+  @media (max-width: 760px) {
+    .copy { top: 96px; transform: none; }
+    .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 52vh; transform: translateY(calc(100% - 46px)); transition: transform .25s; gap: 18px; }
+    .panel.open { transform: none; }
+    .toggle-panel { display: block; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+                    background: none; border: 0; color: var(--ink); text-align: left; padding: 0 0 4px; cursor: pointer; }
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="copy">
+  <span class="mono">Product &amp; UI/UX Designer</span>
+  <h1 data-glass-text>Designing interfaces where software meets hardware.</h1>
+</div>
+
+<div class="bar top">
+  <h2>Glass K</h2>
+  <a class="mono" href="/playground/">← Playground</a>
+</div>
+
+<aside class="panel" id="panel" aria-label="Glass K settings" data-no-poke>
+  <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
+
+  <section>
+    <h3>Typeface</h3>
+    <div class="fonts" id="fonts" role="group" aria-label="Typeface for the K"></div>
+  </section>
+
+  <section>
+    <h3>Glass</h3>
+    <div class="row"><label for="thickness">Refraction</label><output for="thickness"></output><input id="thickness" type="range" min="0" max="4" step="0.05"></div>
+    <div class="row"><label for="dispersion">Rainbow</label><output for="dispersion"></output><input id="dispersion" type="range" min="0" max="15" step="0.1"></div>
+  </section>
+
+  <section>
+    <h3>Liquid</h3>
+    <div class="row"><label for="rippleWidth">Ripple size</label><output for="rippleWidth"></output><input id="rippleWidth" type="range" min="0.15" max="1.4" step="0.01"></div>
+    <div class="row"><label for="rippleSpeed">Ripple speed</label><output for="rippleSpeed"></output><input id="rippleSpeed" type="range" min="0.5" max="6" step="0.1"></div>
+    <div class="row"><label for="jelly">Jelly</label><output for="jelly"></output><input id="jelly" type="range" min="0" max="0.3" step="0.005"></div>
+  </section>
+
+  <section>
+    <label class="switch" for="dark">Dark background <input id="dark" type="checkbox" role="switch"></label>
+  </section>
+
+  <section class="actions">
+    <button type="button" id="poke">Poke</button>
+    <button type="button" id="reset">Reset</button>
+    <button type="button" id="copy" class="primary">Copy settings</button>
+    <div class="copied" id="copied" aria-live="polite" style="grid-column:1/-1"></div>
+    <textarea class="settings" id="settings" rows="6" hidden aria-label="Settings to copy" readonly style="grid-column:1/-1"></textarea>
+  </section>
+</aside>
+
+<script type="module">
+  import { mount, DEFAULTS } from '/assets/js/effects/glass-k.js';
+  const root = document.documentElement;
+  const narrow = () => window.innerWidth < 760;
+  const glass = mount(document.getElementById('stage'), { kX: 0.56, kY: 0.5, kHeight: 0.56 });
+  window.glassK = glass; // handy in the console: glassK.set({ ior: 2 }), glassK.get()
+
+  // sliders: id = option name; value shown to two decimals
+  const sliders = ['thickness', 'dispersion', 'rippleWidth', 'rippleSpeed', 'jelly'];
+  const syncUI = () => {
+    const s = glass.get();
+    for (const id of sliders) { const el = document.getElementById(id); el.value = s[id]; document.querySelector(`output[for="${id}"]`).textContent = (+s[id]).toFixed(2); }
+    document.getElementById('dark').checked = s.background !== '#ffffff';
+    root.dataset.theme = s.background !== '#ffffff' ? 'dark' : 'light';
+    document.querySelectorAll('#fonts button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.font === s.font)));
+  };
+  for (const id of sliders) {
+    document.getElementById(id).addEventListener('input', (e) => { glass.set({ [id]: +e.target.value }); syncUI(); });
+  }
+
+  // dark background switch: the glass scene and the page change together
+  const THEMES = { light: { background: '#ffffff', ink: '#101820' }, dark: { background: '#0c0c0d', ink: '#f2ede8' } };
+  document.getElementById('dark').addEventListener('change', (e) => { glass.set(THEMES[e.target.checked ? 'dark' : 'light']); syncUI(); });
+
+  // typeface buttons, each with a tiny drawing of its K
+  const glyphs = await fetch('/assets/vendor/k-glyphs.json').then((r) => r.json()).then((d) => d.fonts).catch(() => []);
+  const fonts = await glass.fonts();
+  const box = document.getElementById('fonts');
+  for (const f of fonts) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.font = f.id;
+    const c = document.createElement('canvas'); c.width = 80; c.height = 80;
+    b.append(c, Object.assign(document.createElement('span'), { textContent: f.label }));
+    b.addEventListener('click', () => { glass.set({ font: f.id }); syncUI(); });
+    box.append(b);
+    drawPreview(c, glyphs.find((g) => g.id === f.id));
+  }
+  function drawPreview(c, glyph) {
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = getComputedStyle(root).getPropertyValue('--ink');
+    if (!glyph) { // built-in block K
+      const pts = [[0, 0], [0, 1], [0.3, 1], [0.3, 0.6], [0.68, 1], [1.05, 1], [0.57, 0.53], [1.09, 0], [0.72, 0], [0.38, 0.39], [0.3, 0.31], [0.3, 0]];
+      ctx.beginPath(); pts.forEach(([x, y], i) => { const px = 14 + (x + y * 0.2) * 44, py = 66 - y * 52; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.fill();
+      return;
+    }
+    const t = glyph.outline.split(' ').map((v) => (isNaN(+v) ? v : +v));
+    const nums = t.filter((v) => typeof v === 'number');
+    const xs = nums.filter((_, i) => i % 2 === 0), ys = nums.filter((_, i) => i % 2 === 1);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const s = 52 / Math.max(maxX - minX, maxY - minY);
+    const X = (x) => 40 + (x - (minX + maxX) / 2) * s, Y = (y) => 40 - (y - (minY + maxY) / 2) * s;
+    ctx.beginPath();
+    for (let i = 0; i < t.length;) {
+      const cmd = t[i++];
+      if (cmd === 'm') ctx.moveTo(X(t[i++]), Y(t[i++]));
+      else if (cmd === 'l') ctx.lineTo(X(t[i++]), Y(t[i++]));
+      else if (cmd === 'q') { const x = t[i++], y = t[i++], cx = t[i++], cy = t[i++]; ctx.quadraticCurveTo(X(cx), Y(cy), X(x), Y(y)); }
+      else if (cmd === 'b') { const x = t[i++], y = t[i++], ax = t[i++], ay = t[i++], bx = t[i++], by = t[i++]; ctx.bezierCurveTo(X(ax), Y(ay), X(bx), Y(by), X(x), Y(y)); }
+    }
+    ctx.fill('nonzero');
+  }
+  const redrawPreviews = () => document.querySelectorAll('#fonts button').forEach((b) => { const c = b.querySelector('canvas'); c.getContext('2d').clearRect(0, 0, 80, 80); drawPreview(c, glyphs.find((g) => g.id === b.dataset.font)); });
+  document.getElementById('dark').addEventListener('change', () => requestAnimationFrame(redrawPreviews));
+
+  document.getElementById('poke').addEventListener('click', () => glass.poke());
+  document.getElementById('reset').addEventListener('click', () => { glass.reset(); syncUI(); redrawPreviews(); });
+
+  // copy the settings that differ from the homepage defaults, ready to paste back to the site secretary
+  document.getElementById('copy').addEventListener('click', async () => {
+    const s = glass.get();
+    const keys = ['font', 'thickness', 'dispersion', 'rippleWidth', 'rippleSpeed', 'jelly', 'background', 'ink'];
+    const text = 'Glass K settings: ' + JSON.stringify(Object.fromEntries(keys.map((k) => [k, s[k]])));
+    const note = document.getElementById('copied'), area = document.getElementById('settings');
+    try { await navigator.clipboard.writeText(text); note.textContent = 'Copied — paste it to the secretary'; area.hidden = true; }
+    catch { area.hidden = false; area.value = text; area.select(); note.textContent = 'Select the text below and copy it'; }
+  });
+
+  // phones: the panel is a bottom sheet
+  const panel = document.getElementById('panel'), tp = document.getElementById('togglePanel');
+  tp.addEventListener('click', () => { const open = panel.classList.toggle('open'); tp.setAttribute('aria-expanded', String(open)); tp.textContent = open ? '⌄ Settings' : '⌃ Settings'; });
+
+  syncUI();
+  document.fonts?.ready.then(() => glass.repaint());
+</script>
+<script type="module" src="/assets/js/exp-notes.js"></script>
+</body>
+</html>

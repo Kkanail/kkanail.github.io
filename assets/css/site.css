@@ -140,6 +140,9 @@ body.landing { height: 100vh; height: 100dvh; min-height: 560px; overflow: hidde
 .hero-text h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 4.8vw, 72px); line-height: 1.04; letter-spacing: -.03em; }
 .hero-text p { font-size: 18px; color: var(--mute); max-width: 34em; }
 .hero-text .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+/* homepage main CTA: ink instead of the accent purple (Kailan, 2026-11-10) */
+.hero-text .btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.hero-text .btn.primary:hover { background: #2b3540; border-color: #2b3540; }
 
 /* glass K variant: the effect fills the hero; the H1 sits on top and its glyphs are painted into the 3D scene,
    so the DOM copy turns transparent once the effect is running (it stays for screen readers and search) */

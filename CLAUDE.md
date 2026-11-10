@@ -27,6 +27,13 @@ Talk to Kailan in Traditional Chinese (台灣用語). Site copy is mixed Chinese
 add a new file with the same contract and change `data-effect`. The effect must:
 draw inside `el` only, handle resize, respect `prefers-reduced-motion`, and still look alive on touch devices.
 
+The homepage currently uses `glass-k` (a glass K refracting the H1, `<main class="hero hero--glass">`).
+Its look is set by the JSON in the slot's `data-options` attribute (passed to `mount`). Kailan tunes it in the
+Glass K lab (`/playground/glass-k/`) and pastes a "Glass K settings: {...}" line — copy those values into `data-options`.
+To add a homepage background image: save it (≤ 2000px wide, compressed) in `assets/home/`, then add
+`"backgroundImage": "/assets/home/<file>"` to `data-options`. The glass refracts it along with the heading.
+For the old split layout with the dot field: `<main class="hero">` and `data-effect="dot-field"`.
+
 ## Adding things (use the slash commands)
 
 - `/new-experiment` — add a Playground experiment

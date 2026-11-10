@@ -97,8 +97,9 @@ main { flex: 1; }
   transition: background .15s, color .15s, border-color .15s;
 }
 .btn:hover { border-color: var(--ink); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { background: #5b44bd; }
+/* primary buttons are ink (Kailan, 2026-11-10); purple stays for small accents */
+.btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn.primary:hover { background: #2b3540; border-color: #2b3540; }
 .btn.small { padding: 7px 16px; font-size: 14px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -140,9 +141,6 @@ body.landing { height: 100vh; height: 100dvh; min-height: 560px; overflow: hidde
 .hero-text h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 4.8vw, 72px); line-height: 1.04; letter-spacing: -.03em; }
 .hero-text p { font-size: 18px; color: var(--mute); max-width: 34em; }
 .hero-text .cta { display: flex; flex-wrap: wrap; gap: 12px; }
-/* homepage main CTA: ink instead of the accent purple (Kailan, 2026-11-10) */
-.hero-text .btn.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-.hero-text .btn.primary:hover { background: #2b3540; border-color: #2b3540; }
 
 /* glass K variant: the effect fills the hero; the H1 sits on top and its glyphs are painted into the 3D scene,
    so the DOM copy turns transparent once the effect is running (it stays for screen readers and search) */

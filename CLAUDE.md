@@ -66,7 +66,8 @@ Every change that visitors would notice also gets one `"type": "update"` entry i
 
 - White background, 1px hairlines `#E3E3E3`, ink `#101820`, muted `#6B6F76`, one accent `#6E56CF`.
 - Headings: Newsreader + Noto Serif TC. Body: Open Sans + Noto Sans TC. Labels: DM Mono, uppercase.
-- Restraint: colour only in small tags, dots and the primary button. No shadows, no gradients.
+- Primary buttons (`.btn.primary`) are ink `#101820` with white text, not purple.
+- Restraint: the accent colour only in small tags, dots, labels and the New badge. No shadows, no gradients.
 
 ## Things Kailan asked for — do not change without asking
 

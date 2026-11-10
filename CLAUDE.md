@@ -22,7 +22,7 @@ Talk to Kailan in Traditional Chinese (台灣用語). Site copy is mixed Chinese
 
 ## The homepage effect slot
 
-`index.html` has `<div class="effect-slot" data-effect="dot-field">`. Effects live in
+`index.html` has `<div class="effect-slot" data-effect="glass-k" data-options='{...}'>`. Effects live in
 `assets/js/effects/<name>.js` and export `mount(el, options) → cleanup()`. To swap the effect,
 add a new file with the same contract and change `data-effect`. The effect must:
 draw inside `el` only, handle resize, respect `prefers-reduced-motion`, and still look alive on touch devices.

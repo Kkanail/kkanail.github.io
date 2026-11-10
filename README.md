@@ -36,5 +36,17 @@ python3 -m http.server 8000
 
 ## 待辦
 
-- Work：從 Figma 匯出作品圖，填進 `data/works.json` 的 `cover`；之後補作品內頁
-- 綁定 kailanhuang.com：repo Settings → Pages → Custom domain，DNS 加 CNAME 指向 `kkanail.github.io`
+- **首頁背景圖**：等 Kailan 給圖 → 壓到 2000px 寬以內放進 `assets/home/`，在 `index.html` 的 `data-options` 加 `"backgroundImage"`（見 CLAUDE.md）
+- **分享預覽圖**：各頁和每個實驗頁加 `og:title` / `og:description` / `og:image`（用各實驗的 `thumb.png`），讓連結貼到 Threads、LINE 時帶縮圖
+- **Work**：從 Figma 匯出作品圖，填進 `data/works.json` 的 `cover`；之後補作品內頁（v1 線框有模板）
+- **綁定 kailanhuang.com**：repo Settings → Pages → Custom domain，DNS 加 CNAME 指向 `kkanail.github.io`
+- **全站主按鈕已改黑色**；實驗頁自己的按鈕（如 Glass K 的 Copy settings）還是紫色，Kailan 沒要求改
+
+## 參考資料（不在 repo 裡）
+
+- Figma 線框：https://www.figma.com/design/4USeUjDVELHwT3XT1E27if/Kailan-s-Website （頁面「Wireframe v1」「Wireframe v2」）
+- Drive 收件匣「Playground inbox」：https://drive.google.com/drive/folders/1-YQGYb9yMBX66-YjO09kFa_XZA8yvIy9
+- 私人預覽（claude.ai artifact）：首頁玻璃 K https://claude.ai/artifact/27Nxzwa5Dm3KVFgRaazg9L ·
+  Glass K 實驗台 https://claude.ai/artifact/X6zFYNiPxUENX3YVJuAQfm · 金魚 https://claude.ai/artifact/Ah5ELryTUqGXSajgY2afoW
+- 雲端環境請選「kkanail.github.io」：可以連到正式網站和參考網站，上線後能自己驗證。
+  這個環境連不到 Google Fonts 和 jsDelivr，本機測試時把字型請求擋掉即可。

@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/site.css">
+<!-- three.js is self-hosted (assets/vendor/three); effects import it as "three" -->
+<script type="importmap">{ "imports": { "three": "/assets/vendor/three/three.module.min.js" } }</script>
 <script type="module" src="/assets/js/site.js"></script>
 </head>
 <body class="landing">
@@ -22,12 +24,14 @@
     <li><a href="/about/">About</a></li>
   </ul></nav>
 </header>
-<main class="hero">
-  <!-- Interactive slot: swap the effect by changing data-effect (files live in /assets/js/effects/) -->
-  <div class="effect-slot" data-effect="dot-field"></div>
+<main class="hero hero--glass">
+  <!-- Interactive slot: swap the effect by changing data-effect (files live in /assets/js/effects/).
+       glass-k fills the whole hero and refracts the H1 marked data-glass-text. For the old split layout use
+       <main class="hero"> with data-effect="dot-field". -->
+  <div class="effect-slot" data-effect="glass-k"></div>
   <div class="hero-text">
     <span class="mono">Product &amp; UI/UX Designer</span>
-    <h1>Designing interfaces where software meets hardware.</h1>
+    <h1 data-glass-text>Designing interfaces where software meets hardware.</h1>
     <hr class="rule">
     <p>10 years designing DeFi tools, AI products, banking apps and the screens on watches and motherboards.</p>
     <div class="cta">

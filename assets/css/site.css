@@ -141,6 +141,15 @@ body.landing { height: 100vh; height: 100dvh; min-height: 560px; overflow: hidde
 .hero-text p { font-size: 18px; color: var(--mute); max-width: 34em; }
 .hero-text .cta { display: flex; flex-wrap: wrap; gap: 12px; }
 
+/* glass K variant: the effect fills the hero; the H1 sits on top and its glyphs are painted into the 3D scene,
+   so the DOM copy turns transparent once the effect is running (it stays for screen readers and search) */
+.hero--glass { display: block; position: relative; }
+.hero--glass .effect-slot { position: absolute; inset: 0; border: 0; }
+.hero--glass .hero-text { position: relative; z-index: 1; height: 100%; gap: 24px; pointer-events: none; }
+.hero--glass .hero-text a, .hero--glass .hero-text button { pointer-events: auto; }
+.hero--glass .hero-text h1 { font-size: clamp(52px, 8.4vw, 140px); line-height: .98; max-width: 11em; }
+.glass-k-on .hero--glass [data-glass-text] { color: transparent; }
+
 /* ---------- inner pages ---------- */
 .page-head {
   display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 24px;
@@ -247,6 +256,9 @@ body.landing { height: 100vh; height: 100dvh; min-height: 560px; overflow: hidde
   body.landing { height: auto; overflow: auto; }
   .hero { grid-template-columns: 1fr; }
   .effect-slot { height: 46vh; min-height: 280px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .hero--glass { min-height: calc(100svh - 120px); }
+  .hero--glass .effect-slot { height: auto; min-height: 0; border: 0; }
+  .hero--glass .hero-text { padding-block: 32px 40px; justify-content: flex-start; }
   .cell-grid { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }
   .side { border-right: 0; border-bottom: 1px solid var(--line); padding: 32px 16px; gap: 24px; }

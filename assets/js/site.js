@@ -33,7 +33,9 @@ async function mountEffect() {
   if (!slot) return;
   try {
     const mod = await import(`/assets/js/effects/${slot.dataset.effect}.js`);
-    mod.mount(slot);
+    let opts = {};
+    try { opts = JSON.parse(slot.dataset.options || '{}'); } catch (err) { console.warn('Bad data-options on the effect slot', err); }
+    mod.mount(slot, opts);
   } catch (err) { console.warn('Effect failed to load', err); }
 }
 

@@ -9,10 +9,12 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from '/assets/vendor/three/RoomEnvironment.js';
 
+// Defaults = the homepage look Kailan picked in the Glass K lab (2026-11-10).
 export const DEFAULTS = {
   // scene
   background: '#ffffff',
   ink: '#101820',          // colour of the refracted heading
+  backgroundImage: '',     // optional image behind the heading (cover-fit); the glass refracts it too
   // shape
   font: 'block',           // 'block' (built-in) or an id from /assets/vendor/k-glyphs.json
   kHeight: 0.52,           // K height as a fraction of the slot height
@@ -22,23 +24,25 @@ export const DEFAULTS = {
   depth: 0.36,             // extrusion depth, relative to K height
   bevel: 0.055,            // rounded edge size
   // glass
-  thickness: 1.2,          // how strongly the glass bends what's behind it
+  thickness: 1,            // how strongly the glass bends what's behind it
   ior: 1.5,                // index of refraction (glass ≈ 1.5, water 1.33, diamond 2.4)
-  dispersion: 3.5,         // rainbow split at the edges
+  dispersion: 6.5,         // rainbow split at the edges
   roughness: 0.02,         // 0 = clear, higher = frosted
   envIntensity: 0.55,      // strength of reflections
   // liquid
-  rippleSpeed: 2.2,        // world units / s (the view is 10 units tall)
-  rippleWidth: 0.55,       // width of each ripple ring
+  rippleSpeed: 5.3,        // world units / s (the view is 10 units tall)
+  rippleWidth: 0.4,        // width of each ripple ring
   rippleFreq: 7,           // rings per ripple
   rippleDecay: 1.4,        // how fast ripples fade
   hoverStrength: 0.45,
   clickStrength: 1.2,
-  jelly: 0.08,             // squash and stretch after a click
+  jelly: 0.3,              // squash and stretch after a click
   // motion
   idleSpin: 0.2,           // side-to-side turn while idle (radians)
   idleTilt: 0.1,           // up-and-down tilt while idle
   follow: 0.25,            // how much the K leans toward the pointer
+  autoSpin: 0.6,           // full turns when nobody is interacting (radians / s, 0 = off)
+  idleDelay: 3,            // seconds without pointer movement before the K starts spinning
 };
 const CONFIG = { textSelector: '[data-glass-text]', mobileBreak: 760, glyphsUrl: '/assets/vendor/k-glyphs.json' };
 
@@ -100,12 +104,28 @@ export function mount(el, options = {}) {
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: textTex, toneMapped: false }));
   scene.add(plane);
 
+  let bgImg = null, bgSrc = '';
+  function loadBackground() {
+    if (o.backgroundImage === bgSrc) return;
+    bgSrc = o.backgroundImage; bgImg = null;
+    if (!bgSrc) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => { if (bgSrc === o.backgroundImage) { bgImg = img; paintText(); if (reduce) render(); } };
+    img.onerror = () => console.warn('Glass K: could not load background image', bgSrc);
+    img.src = bgSrc;
+  }
   function paintText() {
     const r = el.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     textCanvas.width = Math.max(1, Math.round(r.width * dpr)); textCanvas.height = Math.max(1, Math.round(r.height * dpr));
     textCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     textCtx.fillStyle = o.background; textCtx.fillRect(0, 0, r.width, r.height);
+    if (bgImg) { // cover-fit, centred
+      const s = Math.max(r.width / bgImg.naturalWidth, r.height / bgImg.naturalHeight);
+      const w = bgImg.naturalWidth * s, h = bgImg.naturalHeight * s;
+      textCtx.drawImage(bgImg, (r.width - w) / 2, (r.height - h) / 2, w, h);
+    }
     for (const node of document.querySelectorAll(o.textSelector)) {
       const cs = getComputedStyle(node);
       textCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
@@ -193,6 +213,7 @@ export function mount(el, options = {}) {
   // push every option into the scene (called on mount and whenever .set() changes something)
   function apply(relayout = true) {
     renderer.setClearColor(o.background, 1);
+    loadBackground();
     buildGeometry();
     // changing values is free; only switching dispersion on/off changes the shader, so recompile just then
     const shaderChange = (material.dispersion > 0) !== (o.dispersion > 0);
@@ -229,7 +250,8 @@ export function mount(el, options = {}) {
   const tilt = { x: 0, y: 0, tx: 0, ty: 0 };
   let rippleIdx = 0, lastPoke = { x: 1e9, y: 1e9, t: -1 };
   const wobble = { v: 0, x: 0 };
-  let time = 0;
+  const spin = { angle: 0, vel: 0 };
+  let time = 0, lastActive = 0;
 
   function hitAt(clientX, clientY) {
     const r = el.getBoundingClientRect();
@@ -248,6 +270,7 @@ export function mount(el, options = {}) {
   function onMove(ev) {
     const h = hitAt(ev.clientX, ev.clientY);
     if (!h) { tilt.tx = 0; tilt.ty = 0; return; }
+    lastActive = time;
     tilt.tx = h.ny * o.follow * 0.72; tilt.ty = h.nx * o.follow;
     if (h.hit && !reduce) {
       const p = h.hit.point;
@@ -257,6 +280,7 @@ export function mount(el, options = {}) {
   function onDown(ev) {
     if (ev.target.closest && ev.target.closest('a, button, input, label, select, textarea, [data-no-poke]')) return;
     const h = hitAt(ev.clientX, ev.clientY);
+    if (h) lastActive = time;
     if (h && h.hit && !reduce) { poke(h.hit.point, o.clickStrength); wobble.v += 2.2; }
   }
 
@@ -274,7 +298,16 @@ export function mount(el, options = {}) {
     const sq = wobble.x * o.jelly;
     k.scale.set(kBase.s * (1 + sq), kBase.s * (1 - sq), kBase.s * (1 + sq * 0.5));
     k.rotation.x = Math.sin(time * 0.35) * o.idleTilt - tilt.x;
-    k.rotation.y = Math.sin(time * 0.45) * o.idleSpin + tilt.y;
+    // idle: spin all the way round; when someone moves the pointer, ease back to the nearest front-facing turn
+    if (o.autoSpin > 0 && time - lastActive > o.idleDelay) {
+      spin.vel += (o.autoSpin - spin.vel) * Math.min(1, dt * 1.2);
+      spin.angle += spin.vel * dt;
+    } else {
+      spin.vel = 0;
+      const front = Math.round(spin.angle / (Math.PI * 2)) * Math.PI * 2;
+      spin.angle += (front - spin.angle) * Math.min(1, dt * 2.5);
+    }
+    k.rotation.y = spin.angle + Math.sin(time * 0.45) * o.idleSpin + tilt.y;
     k.rotation.z = Math.sin(time * 0.25) * 0.03;
     k.position.y = kBase.y + Math.sin(time * 0.6) * 0.08;
     render();
@@ -301,13 +334,14 @@ export function mount(el, options = {}) {
     canvas.remove();
   };
   cleanup.set = (patch) => {
-    const relayout = ['background', 'ink', 'kHeight', 'kX', 'kY', 'responsive'].some((key) => key in patch && patch[key] !== o[key]);
+    const relayout = ['background', 'ink', 'backgroundImage', 'kHeight', 'kX', 'kY', 'responsive'].some((key) => key in patch && patch[key] !== o[key]);
     Object.assign(o, patch); apply(relayout);
   };
   cleanup.get = () => Object.fromEntries(Object.keys(DEFAULTS).map((key) => [key, o[key]]));
   cleanup.reset = () => cleanup.set({ ...DEFAULTS, ...options });
   cleanup.repaint = () => paintText(); // call after the heading text or size changes
   cleanup.fonts = () => ready.then((list) => [{ id: 'block', label: 'Block' }, ...list.map(({ id, label }) => ({ id, label }))]);
+  cleanup.wake = () => { lastActive = time; }; // stop the idle spin as if the pointer moved
   cleanup.poke = (strength = o.clickStrength) => { poke({ x: k.position.x, y: k.position.y }, strength); wobble.v += 2.2; };
   return cleanup;
 }

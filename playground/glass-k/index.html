@@ -57,6 +57,13 @@
   .actions button:hover { border-color: var(--ink); }
   .actions .primary { grid-column: 1 / -1; background: var(--accent); border-color: var(--accent); color: #fff; }
   [data-theme="dark"] .actions .primary { color: #141415; }
+  .hint-text { font-size: 12px; line-height: 1.5; color: var(--mute); margin-top: 8px; }
+  .bg-pick { display: flex; gap: 6px; margin-top: 12px; }
+  .bg-pick .file, .bg-pick button { flex: 1; text-align: center; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+    border: 1px dashed var(--line); background: none; color: var(--ink); border-radius: 4px; padding: 9px 8px; cursor: pointer; }
+  .bg-pick .file:hover, .bg-pick button:hover { border-color: var(--ink); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  #bgFile:focus-visible + * , .bg-pick:focus-within .file { outline: 2px solid var(--accent); outline-offset: 2px; }
   .copied { font: 12px "DM Mono", ui-monospace, monospace; color: var(--accent); min-height: 1.4em; text-align: center; }
   textarea.settings { width: 100%; font: 11px/1.5 "DM Mono", ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
   button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -105,7 +112,20 @@
   </section>
 
   <section>
+    <h3>Motion</h3>
+    <div class="row"><label for="autoSpin">Auto spin</label><output for="autoSpin"></output><input id="autoSpin" type="range" min="0" max="2" step="0.05"></div>
+    <p class="hint-text">Spins after 3 seconds without moving the mouse. 0 = off.</p>
+  </section>
+
+  <section>
+    <h3>Background</h3>
     <label class="switch" for="dark">Dark background <input id="dark" type="checkbox" role="switch"></label>
+    <div class="bg-pick">
+      <label class="file" for="bgFile">Try an image…</label>
+      <input id="bgFile" type="file" accept="image/*" class="visually-hidden">
+      <button type="button" id="bgClear" hidden>Remove</button>
+    </div>
+    <p class="hint-text">Stays in your browser. To use it on the homepage, send the file to the secretary.</p>
   </section>
 
   <section class="actions">
@@ -125,7 +145,7 @@
   window.glassK = glass; // handy in the console: glassK.set({ ior: 2 }), glassK.get()
 
   // sliders: id = option name; value shown to two decimals
-  const sliders = ['thickness', 'dispersion', 'rippleWidth', 'rippleSpeed', 'jelly'];
+  const sliders = ['thickness', 'dispersion', 'rippleWidth', 'rippleSpeed', 'jelly', 'autoSpin'];
   const syncUI = () => {
     const s = glass.get();
     for (const id of sliders) { const el = document.getElementById(id); el.value = s[id]; document.querySelector(`output[for="${id}"]`).textContent = (+s[id]).toFixed(2); }
@@ -182,12 +202,23 @@
   document.getElementById('dark').addEventListener('change', () => requestAnimationFrame(redrawPreviews));
 
   document.getElementById('poke').addEventListener('click', () => glass.poke());
-  document.getElementById('reset').addEventListener('click', () => { glass.reset(); syncUI(); redrawPreviews(); });
+
+  // try a background image locally (object URL; nothing is uploaded)
+  let bgUrl = '';
+  const bgFile = document.getElementById('bgFile'), bgClear = document.getElementById('bgClear');
+  bgFile.addEventListener('change', () => {
+    const file = bgFile.files[0]; if (!file) return;
+    if (bgUrl) URL.revokeObjectURL(bgUrl);
+    bgUrl = URL.createObjectURL(file);
+    glass.set({ backgroundImage: bgUrl }); bgClear.hidden = false;
+  });
+  bgClear.addEventListener('click', () => { glass.set({ backgroundImage: '' }); if (bgUrl) URL.revokeObjectURL(bgUrl); bgUrl = ''; bgFile.value = ''; bgClear.hidden = true; });
+  document.getElementById('reset').addEventListener('click', () => { glass.reset(); bgClear.click(); syncUI(); redrawPreviews(); });
 
   // copy the settings that differ from the homepage defaults, ready to paste back to the site secretary
   document.getElementById('copy').addEventListener('click', async () => {
     const s = glass.get();
-    const keys = ['font', 'thickness', 'dispersion', 'rippleWidth', 'rippleSpeed', 'jelly', 'background', 'ink'];
+    const keys = ['font', 'thickness', 'dispersion', 'rippleWidth', 'rippleSpeed', 'jelly', 'autoSpin', 'background', 'ink'];
     const text = 'Glass K settings: ' + JSON.stringify(Object.fromEntries(keys.map((k) => [k, s[k]])));
     const note = document.getElementById('copied'), area = document.getElementById('settings');
     try { await navigator.clipboard.writeText(text); note.textContent = 'Copied — paste it to the secretary'; area.hidden = true; }

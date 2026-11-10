@@ -28,7 +28,10 @@
   <!-- Interactive slot: swap the effect by changing data-effect (files live in /assets/js/effects/).
        glass-k fills the whole hero and refracts the H1 marked data-glass-text. For the old split layout use
        <main class="hero"> with data-effect="dot-field". -->
-  <div class="effect-slot" data-effect="glass-k"></div>
+  <!-- data-options: settings from the Glass K lab (/playground/glass-k/ → Copy settings).
+       To add a background image behind the heading: put it in /assets/home/ and add "backgroundImage": "/assets/home/<file>" -->
+  <div class="effect-slot" data-effect="glass-k"
+       data-options='{"font":"block","thickness":1,"dispersion":6.5,"rippleWidth":0.4,"rippleSpeed":5.3,"jelly":0.3}'></div>
   <div class="hero-text">
     <span class="mono">Product &amp; UI/UX Designer</span>
     <h1 data-glass-text>Designing interfaces where software meets hardware.</h1>

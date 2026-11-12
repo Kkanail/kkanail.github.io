@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caustics — Playground — Kailan Huang</title>
+<meta name="description" content="Light on the bottom of a pool: up to two million particles act as light rays, bent by a simulated water surface. Raindrops make the webs of light.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
+<style>
+  :root { --bg: #000000; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #0e0e0f; --accent: #b9a8ff; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font: 15px/1.5 "Open Sans", -apple-system, sans-serif; }
+
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; cursor: crosshair; }
+  .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: var(--mute);
+              font: 12px/1.6 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+
+  .bar { position: fixed; left: 16px; right: 16px; top: 16px; z-index: 3; display: flex; align-items: center; gap: 16px; pointer-events: none; }
+  .bar > * { pointer-events: auto; }
+  .hint { position: fixed; left: 16px; bottom: 16px; z-index: 2; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em;
+          text-transform: uppercase; color: var(--mute); pointer-events: none; }
+
+  /* control panel (same layout as the Glass K lab) */
+  .panel { position: fixed; right: 16px; top: 64px; bottom: 16px; width: 280px; z-index: 3; overflow-y: auto;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+  .panel h3 { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 400; margin-bottom: 10px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+  .row + .row, .row + .switch, .switch + .row { margin-top: 12px; }
+  .row label { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .row output { font: 12px "DM Mono", ui-monospace, monospace; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); cursor: pointer; }
+  .switch input { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .2s; flex: none; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .switch input:checked { background: var(--accent); }
+  .switch input:checked::after { transform: translateX(16px); }
+  .hint-text { font-size: 12px; line-height: 1.5; color: var(--mute); margin-top: 8px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+  .actions button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+                    background: none; color: var(--ink); border-radius: 999px; padding: 9px 10px; cursor: pointer; }
+  .actions button:hover { border-color: var(--ink); }
+  .actions .primary { grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: #0e0e0f; }
+  .copied { grid-column: 1 / -1; font: 12px "DM Mono", ui-monospace, monospace; color: var(--accent); min-height: 1.4em; text-align: center; }
+  textarea.settings { grid-column: 1 / -1; width: 100%; font: 11px/1.5 "DM Mono", ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .toggle-panel { display: none; }
+  @media (max-width: 760px) {
+    .hint { bottom: 62px; }
+    .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 56vh; transform: translateY(calc(100% - 46px)); transition: transform .25s; gap: 18px; }
+    .panel.open { transform: none; }
+    .toggle-panel { display: block; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+                    background: none; border: 0; color: var(--ink); text-align: left; padding: 0 0 4px; cursor: pointer; }
+  }
+  @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Caustic light on the bottom of a pool. Click or tap to drop a raindrop."></canvas>
+<div class="bar top">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <h1 class="crumb-here">Caustics</h1>
+  </nav>
+</div>
+<p class="hint">Click to drop</p>
+
+<aside class="panel" id="panel" aria-label="Caustics settings">
+  <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
+  <section>
+    <h3>Light</h3>
+    <div class="row"><label for="particles">Particles</label><output for="particles"></output><input id="particles" type="range" min="0" max="5" step="1"></div>
+    <div class="row"><label for="brightness">Brightness</label><output for="brightness"></output><input id="brightness" type="range" min="0.05" max="1.2" step="0.01"></div>
+    <div class="row"><label for="depth">Depth</label><output for="depth"></output><input id="depth" type="range" min="0.05" max="2" step="0.01"></div>
+    <div class="row"><label for="grain">Grain</label><output for="grain"></output><input id="grain" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="afterglow">Afterglow</label><output for="afterglow"></output><input id="afterglow" type="range" min="0" max="0.95" step="0.01"></div>
+    <p class="hint-text">Depth = how far the light falls after the water bends it. Deeper makes sharper, tangled lines. Grain 0 lines the particles up in rows (fine stripes); 1 scatters them like film grain. Afterglow blends each frame with the last: smoother, dreamier.</p>
+  </section>
+  <section>
+    <h3>Water</h3>
+    <div class="row"><label for="dropSize">Drop size</label><output for="dropSize"></output><input id="dropSize" type="range" min="0.005" max="0.08" step="0.001"></div>
+    <div class="row"><label for="dropStrength">Drop strength</label><output for="dropStrength"></output><input id="dropStrength" type="range" min="0.1" max="3" step="0.05"></div>
+    <div class="row"><label for="speed">Wave speed</label><output for="speed"></output><input id="speed" type="range" min="0.2" max="3" step="0.05"></div>
+    <div class="row"><label for="calm">Calm</label><output for="calm"></output><input id="calm" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="swell">Swell</label><output for="swell"></output><input id="swell" type="range" min="0" max="1" step="0.01"></div>
+    <label class="switch" for="walls">Walls <input id="walls" type="checkbox" role="switch"></label>
+    <p class="hint-text">Calm = how fast ripples fade. Swell = slow waves underneath, so the light never stops moving. Walls bounce ripples back from the edges.</p>
+  </section>
+  <section>
+    <h3>Rain</h3>
+    <div class="row"><label for="rain">Drops / second</label><output for="rain"></output><input id="rain" type="range" min="0" max="8" step="0.1"></div>
+  </section>
+  <section class="actions">
+    <button type="button" id="drop">Drop</button>
+    <button type="button" id="splash">Splash</button>
+    <button type="button" id="still">Still water</button>
+    <button type="button" id="reset">Reset</button>
+    <button type="button" id="copy" class="primary">Copy settings</button>
+    <div class="copied" id="copied" aria-live="polite"></div>
+    <textarea class="settings" id="settings" rows="6" hidden aria-label="Settings to copy" readonly></textarea>
+  </section>
+</aside>
+
+<script>
+(() => {
+  'use strict';
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const COUNTS = [125000, 250000, 500000, 1000000, 1500000, 2000000];
+  const DEFAULTS = {
+    particles: touch ? 1 : 3, brightness: 0.45, depth: 0.9, grain: 0.85, afterglow: 0.6,
+    dropSize: 0.025, dropStrength: 1, speed: 1, calm: 0.35, swell: 0.25, walls: false,
+    rain: reduceMotion ? 0.3 : 1.2,
+  };
+  const S = { ...DEFAULTS };
+
+  const canvas = document.getElementById('stage');
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance' });
+  const fail = (msg) => {
+    canvas.remove();
+    document.body.insertAdjacentHTML('afterbegin', `<div class="fallback">${msg}</div>`);
+  };
+  if (!gl) return fail('This experiment needs WebGL2.');
+  if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) return fail('This browser can’t render float textures, which this experiment needs.');
+
+  // ---------- shaders ----------
+  const QUAD_VS = `#version 300 es
+  out vec2 vUv;
+  void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+  // Height field: r = height, g = velocity. A classic "average of neighbours" wave step,
+  // plus up to 8 drops per pass, plus a sponge at the edges when the walls are off.
+  const SIM_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D uState; uniform vec2 uTexel; uniform float uDamp; uniform float uWalls; uniform float uAspect;
+  uniform int uDropCount; uniform vec4 uDrops[8]; // x, y (uv), radius (screen heights), amplitude
+  void main() {
+    vec4 s = texture(uState, vUv);
+    float avg = (texture(uState, vUv - vec2(uTexel.x, 0.0)).r + texture(uState, vUv + vec2(uTexel.x, 0.0)).r +
+                 texture(uState, vUv - vec2(0.0, uTexel.y)).r + texture(uState, vUv + vec2(0.0, uTexel.y)).r) * 0.25;
+    s.g += (avg - s.r) * 2.0;
+    float edge = min(min(vUv.x, 1.0 - vUv.x) * uAspect, min(vUv.y, 1.0 - vUv.y));
+    float sponge = mix(0.86, 1.0, smoothstep(0.0, 0.07, edge));
+    s.g *= uDamp * mix(sponge, 1.0, uWalls);
+    s.r += s.g;
+    s.r *= mix(mix(sponge, 1.0, 0.6), 1.0, uWalls);
+    for (int i = 0; i < 8; i++) {
+      if (i >= uDropCount) break;
+      vec4 d = uDrops[i];
+      vec2 q = (vUv - d.xy) * vec2(uAspect, 1.0);
+      float t = length(q) / d.z;
+      if (t < 1.0) s.r += d.w * (0.5 + 0.5 * cos(3.14159265 * t));
+    }
+    o = s;
+  }`;
+
+  // One vertex = one light ray. It starts on a (jittered) grid, gets refracted by the water
+  // surface slope at that point, travels "depth" down to the floor and lands as a 1px dot.
+  const PHOTON_VS = `#version 300 es
+  precision highp float;
+  uniform sampler2D uState; uniform vec2 uTexel; uniform vec2 uGrid; uniform float uJitter; uniform float uAspect;
+  uniform float uDepth; uniform float uHeight; uniform float uSwell; uniform float uTime; uniform float uSeed;
+  uint hash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+  vec2 swellGrad(vec2 p) {
+    // a few slow travelling waves, in screen-height units
+    vec2 g = vec2(0.0);
+    vec3 W[4] = vec3[4](vec3(0.83, 0.55, 23.0), vec3(-0.42, 0.91, 31.0), vec3(0.97, -0.26, 41.0), vec3(-0.71, -0.70, 53.0));
+    float A[4] = float[4](1.0, 0.6, 0.35, 0.22);
+    for (int i = 0; i < 4; i++) {
+      vec2 k = W[i].xy * W[i].z;
+      g += A[i] / W[i].z * k * cos(dot(k, p) - uTime * sqrt(W[i].z) * 1.1 + float(i) * 1.7);
+    }
+    return g;
+  }
+  void main() {
+    uint id = uint(gl_VertexID);
+    uint cols = uint(uGrid.x);
+    vec2 cell = vec2(float(id % cols), float(id / cols));
+    uint sd = hash(uint(uSeed) + 1u); uint h1 = hash(id ^ sd), h2 = hash(h1 + 0x9e3779b9u);
+    vec2 jit = (vec2(float(h1 & 0xffffu), float(h2 & 0xffffu)) / 65535.0 - 0.5) * uJitter;
+    // spawn slightly beyond the screen so light can be bent in from the edges
+    vec2 uv = mix(vec2(-0.04), vec2(1.04), (cell + 0.5 + jit) / uGrid);
+    // surface slope (height per screen height)
+    float hx = texture(uState, uv + vec2(uTexel.x, 0.0)).r - texture(uState, uv - vec2(uTexel.x, 0.0)).r;
+    float hy = texture(uState, uv + vec2(0.0, uTexel.y)).r - texture(uState, uv - vec2(0.0, uTexel.y)).r;
+    vec2 grad = vec2(hx / (2.0 * uTexel.x * uAspect), hy / (2.0 * uTexel.y)) * uHeight;
+    vec2 p = uv * vec2(uAspect, 1.0);
+    grad += swellGrad(p) * uSwell * 0.006;
+    vec3 n = normalize(vec3(-grad, 1.0));
+    vec3 r = refract(vec3(0.0, 0.0, -1.0), n, 1.0 / 1.333);
+    vec2 hit = p + r.xy / -r.z * uDepth;
+    vec2 ndc = hit / vec2(uAspect, 1.0) * 2.0 - 1.0;
+    gl_Position = vec4(ndc, 0.0, 1.0);
+    gl_PointSize = 1.0;
+  }`;
+  const PHOTON_FS = `#version 300 es
+  precision highp float;
+  uniform float uWeight; out vec4 o;
+  void main() { o = vec4(uWeight); }`;
+
+  // Light on the floor -> grey. 1 = the average light of still water.
+  const SHOW_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D uLight; uniform float uBright;
+  void main() {
+    float v = texture(uLight, vUv).r;
+    float c = 1.0 - exp(-v * uBright);
+    o = vec4(vec3(pow(c, 1.5)), 1.0);
+  }`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function program(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, ''); u[name] = gl.getUniformLocation(p, name); }
+    return { p, u };
+  }
+  let simP, photonP, showP, fadeP;
+  try {
+    fadeP = program(QUAD_VS, 'void main(){}'.replace('void', '#version 300 es\nprecision mediump float; out vec4 o; void').replace('{}', '{ o = vec4(0.0); }'));
+    simP = program(QUAD_VS, SIM_FS); photonP = program(PHOTON_VS, PHOTON_FS); showP = program(QUAD_VS, SHOW_FS);
+  } catch (e) { console.error(e); return fail('Couldn’t start WebGL on this device.'); }
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+
+  function target(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    return { tex, fb, w, h, free() { gl.deleteTexture(tex); gl.deleteFramebuffer(fb); } };
+  }
+
+  // ---------- sizing ----------
+  let W = 0, H = 0, aspect = 1, sim = null, light = null;
+  function resize() {
+    // light is drawn at up to 1 dot per CSS pixel: finer than that only makes the grain harsher
+    const dpr = Math.min(window.devicePixelRatio || 1, 1);
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr)), h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (w === W && h === H) return;
+    W = canvas.width = w; H = canvas.height = h; aspect = w / h;
+    const simH = touch ? 220 : 300, simW = Math.max(8, Math.round(simH * aspect));
+    if (sim) { sim.forEach((t) => t.free()); light.free(); }
+    sim = [target(simW, simH), target(simW, simH)];
+    light = target(W, H);
+  }
+  let resizeTimer = 0;
+  new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, sim ? 120 : 0); }).observe(canvas);
+  resize();
+
+  // ---------- drops ----------
+  const pending = []; // {x, y (uv, y up), r, a, at}
+  const now = () => performance.now() / 1000;
+  function drop(x = Math.random(), y = Math.random(), scale = 0.7 + Math.random() * 0.6, at = now()) {
+    pending.push({ x, y, r: S.dropSize * scale, a: S.dropStrength * 0.6 * (0.6 + 0.4 * scale), at });
+  }
+  function splash(x = 0.2 + Math.random() * 0.6, y = 0.2 + Math.random() * 0.6) {
+    const t0 = now();
+    for (let i = 0; i < 28; i++) {
+      const ang = Math.random() * Math.PI * 2, rad = Math.sqrt(Math.random()) * 0.11;
+      drop(x + Math.cos(ang) * rad / aspect, y + Math.sin(ang) * rad, 0.35 + Math.random() * 0.5, t0 + Math.random() * 1.4);
+    }
+  }
+  function stillWater() { for (const t of sim) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); } }
+
+  // ---------- loop ----------
+  let last = now(), stepDebt = 0, time = 0, seed = 0;
+  const dropBuf = new Float32Array(32);
+  function frame() {
+    const t = now(), dt = Math.min(0.05, t - last); last = t;
+    const motion = reduceMotion ? 0.35 : 1;
+    time += dt * motion;
+    if (Math.random() < S.rain * dt) drop();
+
+    // wave steps: ~90 per second at speed 1, independent of frame rate
+    stepDebt += dt * 90 * S.speed * motion;
+    let steps = Math.min(8, Math.floor(stepDebt)); stepDebt -= steps; if (steps === 8) stepDebt = 0;
+    const damp = 1 - (0.0015 + S.calm * 0.02);
+    gl.disable(gl.BLEND);
+    gl.useProgram(simP.p);
+    gl.viewport(0, 0, sim[0].w, sim[0].h);
+    gl.uniform2f(simP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
+    gl.uniform1f(simP.u.uDamp, damp);
+    gl.uniform1f(simP.u.uWalls, S.walls ? 1 : 0);
+    gl.uniform1f(simP.u.uAspect, aspect);
+    gl.activeTexture(gl.TEXTURE0); gl.uniform1i(simP.u.uState, 0);
+    for (let i = 0; i < steps; i++) {
+      let n = 0;
+      if (i === 0) {
+        for (let k = pending.length - 1; k >= 0 && n < 8; k--) {
+          const d = pending[k]; if (d.at > t) continue;
+          dropBuf.set([d.x, d.y, d.r, d.a], n * 4); n++; pending.splice(k, 1);
+        }
+      }
+      gl.uniform1i(simP.u.uDropCount, n);
+      if (n) gl.uniform4fv(simP.u.uDrops, dropBuf);
+      gl.bindTexture(gl.TEXTURE_2D, sim[0].tex);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, sim[1].fb);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      sim.reverse();
+    }
+
+    // photons -> light texture (additive)
+    const count = COUNTS[S.particles];
+    const cols = Math.ceil(Math.sqrt(count * aspect)), rows = Math.ceil(count / cols);
+    const area = 1.08 * 1.08;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, light.fb);
+    gl.viewport(0, 0, W, H);
+    // afterglow: fade what's there (dest *= keep), then add this frame's light scaled by (1 - keep)
+    const keep = S.afterglow;
+    gl.enable(gl.BLEND);
+    gl.blendColor(keep, keep, keep, keep); gl.blendFunc(gl.ZERO, gl.CONSTANT_COLOR);
+    gl.useProgram(fadeP.p); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.useProgram(photonP.p);
+    seed = (seed + 1) % 4096;
+    gl.bindTexture(gl.TEXTURE_2D, sim[0].tex); gl.uniform1i(photonP.u.uState, 0);
+    gl.uniform2f(photonP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
+    gl.uniform2f(photonP.u.uGrid, cols, rows);
+    gl.uniform1f(photonP.u.uJitter, S.grain);
+    gl.uniform1f(photonP.u.uAspect, aspect);
+    gl.uniform1f(photonP.u.uDepth, S.depth);
+    gl.uniform1f(photonP.u.uHeight, 0.012);
+    gl.uniform1f(photonP.u.uSwell, S.swell);
+    gl.uniform1f(photonP.u.uTime, time);
+    gl.uniform1f(photonP.u.uSeed, seed);
+    gl.uniform1f(photonP.u.uWeight, (W * H * area) / (cols * rows) * (1 - keep));
+    gl.drawArrays(gl.POINTS, 0, cols * rows);
+    gl.disable(gl.BLEND);
+
+    // show
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(showP.p);
+    gl.bindTexture(gl.TEXTURE_2D, light.tex); gl.uniform1i(showP.u.uLight, 0);
+    gl.uniform1f(showP.u.uBright, S.brightness);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+
+  // a few drops and a splash so the first second isn't empty
+  for (let i = 0; i < 4; i++) drop(Math.random(), Math.random(), 1, now() + i * 0.5);
+  splash(0.72, 0.3);
+  requestAnimationFrame(frame);
+
+  // ---------- input ----------
+  canvas.addEventListener('pointerdown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    drop((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height, 1.1);
+  });
+
+  // ---------- panel ----------
+  const fmt = { particles: (v) => (COUNTS[v] >= 1e6 ? COUNTS[v] / 1e6 + 'M' : COUNTS[v] / 1e3 + 'K'), dropSize: (v) => (+v).toFixed(3), rain: (v) => (+v).toFixed(1) };
+  const sliders = ['particles', 'brightness', 'depth', 'grain', 'afterglow', 'dropSize', 'dropStrength', 'speed', 'calm', 'swell', 'rain'];
+  const sync = () => {
+    for (const id of sliders) {
+      document.getElementById(id).value = S[id];
+      document.querySelector(`output[for="${id}"]`).textContent = (fmt[id] || ((v) => (+v).toFixed(2)))(S[id]);
+    }
+    document.getElementById('walls').checked = S.walls;
+  };
+  for (const id of sliders) document.getElementById(id).addEventListener('input', (e) => { S[id] = +e.target.value; sync(); });
+  document.getElementById('walls').addEventListener('change', (e) => { S.walls = e.target.checked; });
+  document.getElementById('drop').addEventListener('click', () => drop(Math.random(), Math.random(), 1.2));
+  document.getElementById('splash').addEventListener('click', () => splash());
+  document.getElementById('still').addEventListener('click', () => { pending.length = 0; stillWater(); });
+  document.getElementById('reset').addEventListener('click', () => { Object.assign(S, DEFAULTS); sync(); });
+  document.getElementById('copy').addEventListener('click', async () => {
+    const line = 'Caustics settings: ' + JSON.stringify(S);
+    const out = document.getElementById('copied'), ta = document.getElementById('settings');
+    try { await navigator.clipboard.writeText(line); out.textContent = 'Copied — paste it to the secretary'; ta.hidden = true; }
+    catch { ta.value = line; ta.hidden = false; ta.select(); out.textContent = 'Copy this line:'; }
+  });
+  const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
+  tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
+  sync();
+  window.caustics = { S, drop, splash };
+})();
+</script>
+<script type="module" src="/assets/js/exp-notes.js"></script>
+</body>
+</html>

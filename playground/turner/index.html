@@ -52,6 +52,9 @@
   .scenes button { font: 15px "Newsreader", Georgia, serif; border: 1px solid var(--line); background: none; color: var(--mute); border-radius: 4px; padding: 6px; cursor: pointer; }
   .scenes button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
   .switch + .modes { margin-top: 12px; }
+  .sound-btn { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute);
+               background: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+  .sound-btn[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
   .modes button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
                   background: none; color: var(--mute); border-radius: 4px; padding: 9px 6px; cursor: pointer; }
@@ -79,8 +82,9 @@
     <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
     <h1 class="crumb-here">Turner Underwater</h1>
   </nav>
+  <button type="button" class="sound-btn" id="soundBtn" aria-pressed="false">♪ Sound off</button>
 </div>
-<p class="hint">Tap the painting to shatter it</p>
+<p class="hint">Tap the painting to shatter it · sound on</p>
 
 <aside class="panel" id="panel" aria-label="Caustics settings">
   <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
@@ -101,6 +105,14 @@
     <div class="row"><label for="glint">Glints</label><output for="glint"></output><input id="glint" type="range" min="0" max="2" step="0.01"></div>
     <div class="row"><label for="tint">Colour</label><output for="tint"></output><input id="tint" type="range" min="0" max="1" step="0.01"></div>
     <p class="hint-text">Three paintings, three scenes. On the floor: the painting lies at the bottom of the pool and the light webs play over it. As particles: the painting is made of glowing dots, and the water bends each one; tap the painting and it shatters from that spot, then the dots gather into the next picture. Glints = how strongly the light webs flash white over the dots. Focus 0 leaves them in chaos.</p>
+  </section>
+  <section>
+    <h3>Sound</h3>
+    <div class="row"><label for="volume">Volume</label><output for="volume"></output><input id="volume" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="beatNotes">Notes on the beat</label><output for="beatNotes"></output><input id="beatNotes" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="space">Space</label><output for="space"></output><input id="space" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="hiss">Tape hiss</label><output for="hiss"></output><input id="hiss" type="range" min="0" max="1" step="0.01"></div>
+    <p class="hint-text">A shattered painting rings out a full chord; the water's own bursts play single soft notes from the same chord. Space = how big the room sounds. On an iPhone, turn the silent switch off.</p>
   </section>
   <section>
     <h3>Score</h3>
@@ -153,6 +165,7 @@
   const touch = matchMedia('(pointer: coarse)').matches;
   const COUNTS = [125000, 250000, 500000, 1000000, 1500000, 2000000];
   const DEFAULTS = {
+    volume: 0.7, beatNotes: 0.45, space: 0.6, hiss: 0.3,
     bpm: reduceMotion ? 45 : 75, random: false,
     size: 0.36, steep: 4, rough: 0.32, fog: 0.5, fogTime: 0.25,
     wipe: 0.07, snap: 0.3, fade: 6, speed: 1.4, walls: true,
@@ -470,7 +483,7 @@
     hitAt = at || [0.5, 0.5];
     sceneA = sceneMix() > 0.5 ? sceneB : sceneA; sceneB = i; mixStart = clock; built = -1;
     // the water takes the blow too
-    burst(hitAt[0], hitAt[1], 45);
+    burst(hitAt[0], hitAt[1], 45, 0, false, 'shatter');
     sync();
   }
   // How big the painting is on screen (image uv = (screen uv - 0.5) / fit + 0.5).
@@ -494,18 +507,19 @@
   // a slow progression; each burst takes one note of its bar's chord. Low notes make big lumps (long waves), high notes small ones.
   const CHORDS = [[45, 52, 57, 60, 64], [41, 48, 53, 57, 60], [43, 50, 55, 59, 62], [40, 47, 52, 55, 59]];
   const listeners = [];
-  const onBurst = (fn) => listeners.push(fn); // hook for sound later: fn({ x, y, note, place })
+  const onBurst = (fn) => listeners.push(fn); // fn({ x, y, note, place, chord, kind })
+  const chordNow = () => CHORDS[Math.floor(Math.max(0, beat) / 12) % CHORDS.length];
 
   // A burst first shivers as a disk of fog for one beat, then the hill is let go and the web snaps sharp.
   let pendingBurst = null;
   const fogging = [];
-  function burst(x, y, note = 52, place = 0, small = false) {
+  function burst(x, y, note = 52, place = 0, small = false, kind = small ? 'tap' : 'beat') {
     const scale = Math.pow(2, (52 - note) / 18) * (small ? 1.3 : 1); // one octave ≈ 1.6x lump size; taps get bigger, calmer lumps
     const diag = Math.hypot(aspect, 1);
     const fogTime = S.fog > 0 ? S.fogTime * (small ? 0.5 : 1) : 0;
     const b = { x, y, r: S.size * diag * 0.5 * (small ? 0.55 : 1), rough: S.rough * (small ? 0.6 : 1), note, scale, start: clock, release: clock + fogTime };
     fogging.push(b); if (fogging.length > 4) fogging.shift();
-    listeners.forEach((fn) => fn({ x, y, note, place }));
+    listeners.forEach((fn) => fn({ x, y, note, place, chord: chordNow(), kind }));
   }
   function burstAtPlace(place, bar) {
     const [px, py] = PLACES[place];
@@ -662,6 +676,99 @@
   requestAnimationFrame(frame);
 
   // =====================================================================
+  // SOUND — a small synth built from the browser's own Web Audio. Every burst is a chord:
+  // the shatter rings the whole chord with a low root; the water's bursts on the beat play one soft note.
+  // =====================================================================
+  let ac = null, master, dryBus, wetBus, verb, hissGain, soundOn = false;
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  function makeRoom(seconds) {                       // a reverb: a few seconds of fading noise
+    const len = Math.floor(ac.sampleRate * seconds), buf = ac.createBuffer(2, len, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    return buf;
+  }
+  function startAudio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ac = new AC();
+    // iPhone: playing a (silent) media element lets Web Audio sound even with the ringer on silent in some versions
+    try { const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='); a.loop = true; a.play().catch(() => {}); } catch {}
+    master = ac.createGain(); master.gain.value = S.volume;
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
+    master.connect(comp); comp.connect(ac.destination);
+    dryBus = ac.createGain(); wetBus = ac.createGain();
+    verb = ac.createConvolver(); verb.buffer = makeRoom(5);
+    dryBus.connect(master); wetBus.connect(verb); verb.connect(master);
+    setSpace();
+    // tape hiss: soft filtered noise that swells when the water is struck
+    const n = ac.createBufferSource(), nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    n.buffer = nb; n.loop = true;
+    const hp = ac.createBiquadFilter(); hp.type = 'bandpass'; hp.frequency.value = 5200; hp.Q.value = 0.6;
+    hissGain = ac.createGain(); hissGain.gain.value = 0.004 * S.hiss;
+    n.connect(hp); hp.connect(hissGain); hissGain.connect(master); n.start();
+  }
+  function setSpace() { if (!ac) return; dryBus.gain.value = 1 - 0.55 * S.space; wetBus.gain.value = 0.25 + 0.9 * S.space; }
+  // one voice: two slightly detuned oscillators through a low-pass filter that opens slowly, like the fog clearing
+  function voice(midi, t0, { gain = 0.2, attack = 0.04, hold = 0.2, release = 3.5, pan = 0, bright = 1, wave = 'sawtooth' } = {}) {
+    const out = ac.createGain(), f = ac.createBiquadFilter(), p = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    f.type = 'lowpass'; f.Q.value = 0.7;
+    const freq = mtof(midi);
+    f.frequency.setValueAtTime(freq * 1.2, t0);
+    f.frequency.exponentialRampToValueAtTime(Math.min(9000, freq * (3 + 6 * bright)), t0 + attack + 0.6);
+    f.frequency.exponentialRampToValueAtTime(freq * 1.5, t0 + attack + hold + release);
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.exponentialRampToValueAtTime(gain, t0 + attack);
+    out.gain.setValueAtTime(gain, t0 + attack + hold);
+    out.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + hold + release);
+    [-6, 6].forEach((cents) => {
+      const o = ac.createOscillator(); o.type = wave; o.frequency.value = freq; o.detune.value = cents + (Math.random() - 0.5) * 4;
+      o.connect(f); o.start(t0); o.stop(t0 + attack + hold + release + 0.1);
+    });
+    if (p) { p.pan.value = Math.max(-1, Math.min(1, pan)); f.connect(out); out.connect(p); p.connect(dryBus); p.connect(wetBus); }
+    else { f.connect(out); out.connect(dryBus); out.connect(wetBus); }
+  }
+  function swellHiss(amount, t0) {
+    if (!hissGain) return;
+    const base = 0.004 * S.hiss;
+    hissGain.gain.cancelScheduledValues(t0);
+    hissGain.gain.setValueAtTime(Math.max(base, hissGain.gain.value), t0);
+    hissGain.gain.linearRampToValueAtTime(base + 0.03 * S.hiss * amount, t0 + 0.15);
+    hissGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, base), t0 + 4);
+  }
+  onBurst(({ x, note, chord, kind }) => {
+    if (!soundOn || !ac) return;
+    const t0 = ac.currentTime + 0.01, pan = (x - 0.5) * 1.4;
+    if (kind === 'shatter') {
+      // the whole chord, rolled from the bottom like a harp, over a deep root
+      voice(chord[0] - 12, t0, { gain: 0.16, attack: 0.02, hold: 0.6, release: 6, pan: 0, bright: 0.3, wave: 'triangle' });
+      chord.forEach((m, i) => voice(m + 12, t0 + i * 0.07, { gain: 0.085, attack: 0.03, hold: 0.3, release: 5 + i * 0.4, pan: pan * (0.4 + i * 0.15) * (i % 2 ? -1 : 1), bright: 0.9 }));
+      swellHiss(1, t0);
+    } else if (kind === 'tap') {
+      voice(note + 12, t0, { gain: 0.12, attack: 0.02, hold: 0.15, release: 3, pan, bright: 0.8 });
+      voice(note + 19, t0 + 0.05, { gain: 0.06, attack: 0.02, hold: 0.1, release: 2.6, pan: -pan, bright: 0.6 });
+      swellHiss(0.5, t0);
+    } else if (S.beatNotes > 0) {
+      // the water's own bursts: one note, swelling in slowly as its fog clears
+      voice(note + 12, t0, { gain: 0.09 * S.beatNotes, attack: 0.35, hold: 0.2, release: 3.8, pan, bright: 0.5, wave: 'triangle' });
+      swellHiss(0.3 * S.beatNotes, t0);
+    }
+  });
+  const soundBtn = document.getElementById('soundBtn');
+  function setSound(on) {
+    soundOn = on;
+    if (on) startAudio(); else if (ac) ac.suspend();
+    soundBtn.setAttribute('aria-pressed', String(on));
+    soundBtn.textContent = on ? '♪ Sound on' : '♪ Sound off';
+  }
+  soundBtn.addEventListener('click', () => setSound(!soundOn));
+  // the first tap on the painting turns sound on (browsers only allow audio after a tap)
+  canvas.addEventListener('pointerdown', () => { if (!ac) setSound(true); }, { capture: true });
+
+  // =====================================================================
   // INPUT + PANEL
   // =====================================================================
   canvas.addEventListener('pointerdown', (e) => {
@@ -676,7 +783,7 @@
     dots: (v) => (DOT_COUNTS[v] >= 1e6 ? DOT_COUNTS[v] / 1e6 + 'M' : DOT_COUNTS[v] / 1e3 + 'K'),
     bpm: (v) => String(Math.round(v)), wipe: (v) => (+v).toFixed(3), fade: (v) => (+v).toFixed(1),
   };
-  const sliders = ['focus', 'dots', 'glint', 'tint', 'bpm', 'size', 'steep', 'rough', 'fog', 'fogTime', 'wipe', 'snap', 'fade', 'speed', 'particles', 'brightness', 'depth', 'grain', 'afterglow'];
+  const sliders = ['focus', 'dots', 'glint', 'tint', 'volume', 'beatNotes', 'space', 'hiss', 'bpm', 'size', 'steep', 'rough', 'fog', 'fogTime', 'wipe', 'snap', 'fade', 'speed', 'particles', 'brightness', 'depth', 'grain', 'afterglow'];
   const switches = ['random', 'walls', 'auto'];
   const sync = () => {
     for (const id of sliders) {
@@ -691,7 +798,10 @@
   document.getElementById('modeFloor').addEventListener('click', () => { S.mode = 'floor'; sync(); });
   document.getElementById('modeDots').addEventListener('click', () => { S.mode = 'dots'; sync(); });
   document.querySelectorAll('.scenes button').forEach((b) => b.addEventListener('click', () => goTo(+b.dataset.scene)));
-  for (const id of sliders) document.getElementById(id).addEventListener('input', (e) => { S[id] = +e.target.value; sync(); });
+  for (const id of sliders) document.getElementById(id).addEventListener('input', (e) => {
+    S[id] = +e.target.value; sync();
+    if (ac) { master.gain.value = S.volume; setSpace(); hissGain.gain.value = 0.004 * S.hiss; }
+  });
   for (const id of switches) document.getElementById(id).addEventListener('change', (e) => { S[id] = e.target.checked; });
   document.getElementById('burstNow').addEventListener('click', () => burstAtPlace(1 + Math.floor(Math.random() * 9), Math.max(0, Math.floor(beat / 4))));
   document.getElementById('still').addEventListener('click', stillWater);
@@ -707,7 +817,7 @@
   const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
   tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
   sync();
-  window.caustics = { S, burst, burstAtPlace, onBurst, goTo, get beat() { return beat; } };
+  window.caustics = { S, burst, burstAtPlace, onBurst, goTo, get beat() { return beat; }, get audio() { return { ac, master }; } };
 })();
 </script>
 <script type="module" src="/assets/js/exp-notes.js"></script>

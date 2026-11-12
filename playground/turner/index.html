@@ -80,7 +80,7 @@
     <h1 class="crumb-here">Turner Underwater</h1>
   </nav>
 </div>
-<p class="hint">Tap the water for a burst</p>
+<p class="hint">Tap the painting to shatter it</p>
 
 <aside class="panel" id="panel" aria-label="Caustics settings">
   <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
@@ -99,7 +99,7 @@
     <div class="row"><label for="focus">Focus</label><output for="focus"></output><input id="focus" type="range" min="0" max="1" step="0.01"></div>
     <div class="row"><label for="dots">Particles</label><output for="dots"></output><input id="dots" type="range" min="0" max="4" step="1"></div>
     <div class="row"><label for="tint">Colour</label><output for="tint"></output><input id="tint" type="range" min="0" max="1" step="0.01"></div>
-    <p class="hint-text">Three paintings, three scenes. On the floor: the painting lies at the bottom of the pool and the light webs play over it. As particles: the painting is made of glowing dots, and the water bends each one; between scenes they scatter and gather into the next picture. Focus 0 leaves them in chaos.</p>
+    <p class="hint-text">Three paintings, three scenes. On the floor: the painting lies at the bottom of the pool and the light webs play over it. As particles: the painting is made of glowing dots, and the water bends each one; tap the painting and it shatters from that spot, then the dots gather into the next picture. Focus 0 leaves them in chaos.</p>
   </section>
   <section>
     <h3>Score</h3>
@@ -155,8 +155,8 @@
     bpm: reduceMotion ? 45 : 75, random: false,
     size: 0.36, steep: 4, rough: 0.32, fog: 0.5, fogTime: 0.25,
     wipe: 0.07, snap: 0.3, fade: 6, speed: 1.4, walls: true,
-    mode: 'floor', focus: 1, dots: touch ? 1 : 2, tint: 1, auto: true,
-    particles: touch ? 1 : 3, brightness: 0.45, depth: 0.8, grain: touch ? 1 : 0.85, afterglow: 0.55,
+    mode: 'dots', focus: 1, dots: touch ? 1 : 2, tint: 1, auto: false,
+    particles: touch ? 1 : 3, brightness: 0.45, depth: 0.8, grain: touch ? 1 : 0.85, afterglow: 0.35,
   };
   const S = { ...DEFAULTS };
 
@@ -265,7 +265,7 @@
   const DOT_VS = `#version 300 es
   precision highp float;
   layout(location = 0) in vec2 aHomeA; layout(location = 1) in vec3 aColA; layout(location = 2) in vec2 aHomeB; layout(location = 3) in vec3 aColB;
-  uniform float uMix; uniform vec2 uCoverA;
+  uniform float uMix; uniform vec2 uCoverA; uniform vec2 uOrigin; // where the picture was struck (screen-height units)
   uniform sampler2D uState; uniform vec2 uTexel; uniform float uAspect; uniform float uDepth; uniform float uHeight;
   uniform vec2 uCover; uniform float uFocus; uniform float uSeed; uniform float uSize; uniform float uFrame; uniform vec2 uPx;
   out vec3 vCol;
@@ -274,6 +274,8 @@
     // between scenes: leave home A, scatter into chaos halfway, gather at home B
     vec2 ua = (aHomeA - 0.5) * uCoverA + 0.5, ub = (aHomeB - 0.5) * uCover + 0.5;
     float e = uMix * uMix * (3.0 - 2.0 * uMix);
+    float tt = clamp((uMix - clamp(length(ua * vec2(uAspect, 1.0) - uOrigin) * 0.175, 0.0, 0.25)) / 0.75, 0.0, 1.0);
+    e = tt * tt * (3.0 - 2.0 * tt);
     vec2 uv = mix(ua, ub, e);
     float hx = texture(uState, uv + vec2(uTexel.x, 0.0)).r - texture(uState, uv - vec2(uTexel.x, 0.0)).r;
     float hy = texture(uState, uv + vec2(0.0, uTexel.y)).r - texture(uState, uv - vec2(0.0, uTexel.y)).r;
@@ -287,17 +289,25 @@
     vec2 dir = vec2(float(h1 & 0xffffu), float(h2 & 0xffffu)) / 65535.0 - 0.5;
     float ph = float(h3 & 0xffffu) / 65535.0 * 6.2831853;
     float blur = (1.0 - uFocus); blur *= blur;
-    blur = max(blur, 0.35 * sin(3.14159265 * uMix));
+    // shatter: dots fly away from the struck point, near ones first and farthest, then fall into the next picture
+    vec2 fromHit = ua * vec2(uAspect, 1.0) - uOrigin;
+    float dist = length(fromHit);
+    float delay = clamp(dist * 0.35, 0.0, 0.45);                 // the crack spreads outward
+    float t = clamp((uMix - delay * 0.5) / (1.0 - delay * 0.5), 0.0, 1.0);
+    float burstOut = sin(3.14159265 * t) * (0.55 + 0.6 * exp(-dist * 2.5));
+    vec2 radial = normalize(fromHit + 1e-4) * 0.9 + (vec2(float(hash(id * 3u) & 0xffffu), float(hash(id * 5u) & 0xffffu)) / 65535.0 - 0.5) * 0.9;
+    p += radial * burstOut * 0.5;
     p += (dir * 1.6 + 0.04 * vec2(sin(uSeed * 0.013 + ph), cos(uSeed * 0.011 + ph * 1.3))) * blur;
     // a new sub-pixel nudge every frame: with afterglow, the grain melts into smooth paint
     uint h4 = hash(id ^ hash(uint(uFrame) + 7u)), h5 = hash(h4);
-    p += (vec2(float(h4 & 0xffffu), float(h5 & 0xffffu)) / 65535.0 - 0.5) * uPx * vec2(uAspect, 1.0) * 2.5;
+    p += (vec2(float(h4 & 0xffffu), float(h5 & 0xffffu)) / 65535.0 - 0.5) * uPx * vec2(uAspect, 1.0) * 0.6;
     gl_Position = vec4(p / vec2(uAspect, 1.0) * 2.0 - 1.0, 0.0, 1.0);
     gl_PointSize = uSize;
     vCol = mix(aColA, aColB, e);
   }`;
   const DOT_FS = `#version 300 es
-  precision highp float; in vec3 vCol; uniform float uWeight; out vec4 o; void main() { o = vec4(vCol * uWeight, 1.0); }`;
+  precision highp float; in vec3 vCol; uniform float uWeight; out vec4 o;
+  void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.25, d); o = vec4(vCol * uWeight * a, 1.0); }`;  // a soft round dot
   const PHOTON_FS = `#version 300 es
   precision highp float; uniform float uWeight; out vec4 o; void main() { o = vec4(uWeight); }`;
   const FADE_FS = `#version 300 es
@@ -376,7 +386,7 @@
   // =====================================================================
   // PAINTING — the image as a texture (floor mode) and as sampled dots (particle mode)
   // =====================================================================
-  const DOT_COUNTS = [100000, 200000, 400000, 700000, 1000000];
+  const DOT_COUNTS = [30000, 60000, 100000, 180000, 300000];
   // public-domain paintings; see the notes drawer for credits
   const SCENES = [{ src: 'whalers-turner.jpg' }, { src: 'whale-storm.jpg' }, { src: 'whale-boats.jpg' }];
   const grey = new Uint8Array([60, 60, 60, 255]);
@@ -410,10 +420,15 @@
     const out = new Float32Array(n * 5);
     if (!sc.px) return out;
     const { w, h, data: px } = sc.px, N = w * h;
+    // stretch the painting's own range first (Turner's haze is nearly all mid-tones), then favour the light
+    const lum = new Float32Array(N), hist = new Uint32Array(256);
+    for (let i = 0; i < N; i++) { const l = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255; lum[i] = l; hist[Math.min(255, (l * 255) | 0)]++; }
+    let acc = 0, lo2 = 0, hi2 = 255;
+    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc < N * 0.02) lo2 = v; if (acc < N * 0.995) hi2 = v; }
     const cdf = new Float32Array(N); let sum = 0;
     for (let i = 0; i < N; i++) {
-      const l = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255;
-      sum += Math.pow(l, 1.4) + 0.004; cdf[i] = sum;
+      const l = Math.min(1, Math.max(0, (lum[i] * 255 - lo2) / Math.max(1, hi2 - lo2)));
+      sum += Math.pow(l, 2.2) + 0.002; cdf[i] = sum;
     }
     for (let k = 0; k < n; k++) {
       const u = Math.random() * sum;
@@ -432,7 +447,7 @@
   [[0, 2, 0], [1, 3, 8], [2, 2, 20], [3, 3, 28]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 40, off); });
   gl.bindVertexArray(emptyVao);
   let sceneA = 0, sceneB = 0, mixStart = -99, built = -1, dotCount = 0;
-  const MORPH = 3.2; // seconds from one painting to the next
+  const MORPH = 3.6; // seconds from one painting to the next
   function buildDots(n) {
     const a = dotsOf(SCENES[sceneA], n), b = dotsOf(SCENES[sceneB], n), buf = new Float32Array(n * 10);
     for (let k = 0; k < n; k++) { buf.set(a.subarray(k * 5, k * 5 + 5), k * 10); buf.set(b.subarray(k * 5, k * 5 + 5), k * 10 + 5); }
@@ -442,11 +457,13 @@
   }
   const sceneMix = () => Math.min(1, Math.max(0, (clock - mixStart) / MORPH));
   const shownScene = () => (sceneMix() > 0.5 ? sceneB : sceneA);
-  function goTo(i) {
+  let hitAt = [0.5, 0.5];
+  function goTo(i, at) {
     if (i === sceneB && sceneMix() >= 1) return;
+    hitAt = at || [0.5, 0.5];
     sceneA = sceneMix() > 0.5 ? sceneB : sceneA; sceneB = i; mixStart = clock; built = -1;
-    // a big burst lands as the scene changes
-    burstAtPlace(5, 0);
+    // the water takes the blow too
+    burst(hitAt[0], hitAt[1], 45);
     sync();
   }
   const coverOf = (sc) => (aspect > sc.aspect ? [1, aspect / sc.aspect] : [sc.aspect / aspect, 1]); // screen uv per image uv
@@ -576,12 +593,14 @@
       gl.uniform2f(dotP.u.uCover, cover[0], cover[1]);
       gl.uniform2f(dotP.u.uCoverA, coverA[0], coverA[1]);
       gl.uniform1f(dotP.u.uMix, mixNow);
+      gl.uniform2f(dotP.u.uOrigin, hitAt[0] * aspect, hitAt[1]);
       gl.uniform1f(dotP.u.uFrame, seed);
       gl.uniform2f(dotP.u.uPx, 1 / W, 1 / H);
       gl.uniform1f(dotP.u.uFocus, S.focus);
       gl.uniform1f(dotP.u.uSeed, clock * 60);
-      gl.uniform1f(dotP.u.uSize, 2);
-      gl.uniform1f(dotP.u.uWeight, (W * H) / dotCount * 0.45 * (1 - keep));
+      const dotPx = 3.2 * Math.min(2, window.devicePixelRatio || 1) / Math.min(2, window.devicePixelRatio || 1); // ~3 CSS px
+      gl.uniform1f(dotP.u.uSize, dotPx);
+      gl.uniform1f(dotP.u.uWeight, Math.min(1.6, (W * H) / dotCount / (dotPx * dotPx * 0.45) * 0.55) * (1 - keep));
       gl.drawArrays(gl.POINTS, 0, dotCount);
       gl.bindVertexArray(emptyVao);
     } else {
@@ -631,7 +650,9 @@
   canvas.addEventListener('pointerdown', (e) => {
     const r = canvas.getBoundingClientRect();
     const chord = CHORDS[Math.floor(Math.max(0, beat) / 12) % CHORDS.length];
-    burst((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height, chord[Math.floor(Math.random() * chord.length)], 0, true);
+    const at = [(e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height];
+    if (S.mode === 'dots') { if (sceneMix() >= 0.85) goTo((shownScene() + 1) % SCENES.length, at); }
+    else burst(at[0], at[1], chord[Math.floor(Math.random() * chord.length)], 0, true);
   });
   const fmt = {
     particles: (v) => (COUNTS[v] >= 1e6 ? COUNTS[v] / 1e6 + 'M' : COUNTS[v] / 1e3 + 'K'),

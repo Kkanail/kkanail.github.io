@@ -98,8 +98,9 @@
     </div>
     <div class="row"><label for="focus">Focus</label><output for="focus"></output><input id="focus" type="range" min="0" max="1" step="0.01"></div>
     <div class="row"><label for="dots">Particles</label><output for="dots"></output><input id="dots" type="range" min="0" max="4" step="1"></div>
+    <div class="row"><label for="glint">Glints</label><output for="glint"></output><input id="glint" type="range" min="0" max="2" step="0.01"></div>
     <div class="row"><label for="tint">Colour</label><output for="tint"></output><input id="tint" type="range" min="0" max="1" step="0.01"></div>
-    <p class="hint-text">Three paintings, three scenes. On the floor: the painting lies at the bottom of the pool and the light webs play over it. As particles: the painting is made of glowing dots, and the water bends each one; tap the painting and it shatters from that spot, then the dots gather into the next picture. Focus 0 leaves them in chaos.</p>
+    <p class="hint-text">Three paintings, three scenes. On the floor: the painting lies at the bottom of the pool and the light webs play over it. As particles: the painting is made of glowing dots, and the water bends each one; tap the painting and it shatters from that spot, then the dots gather into the next picture. Glints = how strongly the light webs flash white over the dots. Focus 0 leaves them in chaos.</p>
   </section>
   <section>
     <h3>Score</h3>
@@ -155,7 +156,7 @@
     bpm: reduceMotion ? 45 : 75, random: false,
     size: 0.36, steep: 4, rough: 0.32, fog: 0.5, fogTime: 0.25,
     wipe: 0.07, snap: 0.3, fade: 6, speed: 1.4, walls: true,
-    mode: 'dots', focus: 1, dots: touch ? 1 : 2, tint: 1, auto: false,
+    mode: 'dots', focus: 1, dots: touch ? 1 : 2, tint: 1, glint: 1, auto: false,
     particles: touch ? 1 : 3, brightness: 0.45, depth: 0.8, grain: touch ? 1 : 0.85, afterglow: 0.35,
   };
   const S = { ...DEFAULTS };
@@ -307,15 +308,15 @@
   }`;
   const DOT_FS = `#version 300 es
   precision highp float; in vec3 vCol; uniform float uWeight; out vec4 o;
-  void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.25, d); o = vec4(vCol * uWeight * a, 1.0); }`;  // a soft round dot
+  void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.25, d); o = vec4(vCol * uWeight * a, 0.0); }`;  // a soft round dot
   const PHOTON_FS = `#version 300 es
-  precision highp float; uniform float uWeight; out vec4 o; void main() { o = vec4(uWeight); }`;
+  precision highp float; uniform float uWeight; uniform float uAlphaOnly; out vec4 o; void main() { o = vec4(vec3(uWeight * (1.0 - uAlphaOnly)), uWeight); }`;
   const FADE_FS = `#version 300 es
   precision mediump float; out vec4 o; void main() { o = vec4(0.0); }`;
   const SHOW_FS = `#version 300 es
   precision highp float;
   in vec2 vUv; out vec4 o;
-  uniform sampler2D uLight; uniform float uBright; uniform sampler2D uImage; uniform sampler2D uImageA; uniform int uMode; uniform vec2 uCover; uniform vec2 uCoverA; uniform float uMix; uniform float uTint;
+  uniform sampler2D uLight; uniform float uBright; uniform sampler2D uImage; uniform sampler2D uImageA; uniform int uMode; uniform vec2 uCover; uniform vec2 uCoverA; uniform float uMix; uniform float uTint; uniform float uGlint;
   void main() {
     vec4 L = texture(uLight, vUv);
     if (uMode == 0) {
@@ -329,6 +330,10 @@
     } else {
       // the painting's own dots, already coloured
       vec3 rgb = mix(vec3(dot(L.rgb, vec3(0.2126, 0.7152, 0.0722))), L.rgb, uTint);
+      // the light that reaches the floor: where the webs gather it lights the painting and flashes white
+      float light = L.a;                                  // 1 = still water
+      rgb *= mix(1.0, clamp(light, 0.35, 2.5), 0.55 * uGlint);
+      rgb += vec3(max(0.0, light - 1.15)) * 0.9 * uGlint;
       vec3 c = 1.0 - exp(-rgb * uBright);
       o = vec4(pow(c, vec3(1.3)), 1.0);
     }
@@ -611,8 +616,11 @@
       gl.uniform1f(dotP.u.uWeight, Math.min(1.6, (W * H) * cover[0] * cover[1] / dotCount / (dotPx * dotPx * 0.45) * 0.55) * (1 - keep));
       gl.drawArrays(gl.POINTS, 0, dotCount);
       gl.bindVertexArray(emptyVao);
-    } else {
+    }
+    {
+    // the caustic light: on its own (floor mode), or only into alpha as glints over the particle painting
     gl.useProgram(photonP.p);
+    gl.uniform1f(photonP.u.uAlphaOnly, S.mode === 'dots' ? 1 : 0);
     seed = (seed + 1) % 4096;
     gl.bindTexture(gl.TEXTURE_2D, sim[0].tex); gl.uniform1i(photonP.u.uState, 0);
     gl.uniform2f(photonP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
@@ -647,6 +655,7 @@
     gl.uniform2f(showP.u.uCoverA, coverA[0], coverA[1]);
     gl.uniform1f(showP.u.uMix, mixNow);
     gl.uniform1f(showP.u.uTint, S.tint);
+    gl.uniform1f(showP.u.uGlint, S.glint);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     requestAnimationFrame(frame);
   }
@@ -667,7 +676,7 @@
     dots: (v) => (DOT_COUNTS[v] >= 1e6 ? DOT_COUNTS[v] / 1e6 + 'M' : DOT_COUNTS[v] / 1e3 + 'K'),
     bpm: (v) => String(Math.round(v)), wipe: (v) => (+v).toFixed(3), fade: (v) => (+v).toFixed(1),
   };
-  const sliders = ['focus', 'dots', 'tint', 'bpm', 'size', 'steep', 'rough', 'fog', 'fogTime', 'wipe', 'snap', 'fade', 'speed', 'particles', 'brightness', 'depth', 'grain', 'afterglow'];
+  const sliders = ['focus', 'dots', 'glint', 'tint', 'bpm', 'size', 'steep', 'rough', 'fog', 'fogTime', 'wipe', 'snap', 'fade', 'speed', 'particles', 'brightness', 'depth', 'grain', 'afterglow'];
   const switches = ['random', 'walls', 'auto'];
   const sync = () => {
     for (const id of sliders) {

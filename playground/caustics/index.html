@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caustics — Playground — Kailan Huang</title>
-<meta name="description" content="Light on the bottom of a pool: up to two million particles act as light rays, bent by a simulated water surface. Raindrops make the webs of light.">
+<meta name="description" content="Light on the bottom of a pool: up to two million particles act as light rays, bent by a simulated water surface. Stir the water and the light tangles into webs.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
   html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
   body { font: 15px/1.5 "Open Sans", -apple-system, sans-serif; }
 
-  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; cursor: crosshair; }
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
   .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: var(--mute);
               font: 12px/1.6 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
 
@@ -60,7 +60,7 @@
 </style>
 </head>
 <body>
-<canvas id="stage" aria-label="Caustic light on the bottom of a pool. Click or tap to drop a raindrop."></canvas>
+<canvas id="stage" aria-label="Caustic light on the bottom of a pool. Drag to stir the water."></canvas>
 <div class="bar top">
   <nav class="crumbs" aria-label="Breadcrumb">
     <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
@@ -68,7 +68,7 @@
     <h1 class="crumb-here">Caustics</h1>
   </nav>
 </div>
-<p class="hint">Click to drop</p>
+<p class="hint">Drag to stir</p>
 
 <aside class="panel" id="panel" aria-label="Caustics settings">
   <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
@@ -83,8 +83,6 @@
   </section>
   <section>
     <h3>Water</h3>
-    <div class="row"><label for="dropSize">Drop size</label><output for="dropSize"></output><input id="dropSize" type="range" min="0.005" max="0.08" step="0.001"></div>
-    <div class="row"><label for="dropStrength">Drop strength</label><output for="dropStrength"></output><input id="dropStrength" type="range" min="0.1" max="3" step="0.05"></div>
     <div class="row"><label for="speed">Wave speed</label><output for="speed"></output><input id="speed" type="range" min="0.2" max="3" step="0.05"></div>
     <div class="row"><label for="calm">Calm</label><output for="calm"></output><input id="calm" type="range" min="0" max="1" step="0.01"></div>
     <div class="row"><label for="swell">Swell</label><output for="swell"></output><input id="swell" type="range" min="0" max="1" step="0.01"></div>
@@ -92,12 +90,22 @@
     <p class="hint-text">Calm = how fast ripples fade. Swell = slow waves underneath, so the light never stops moving. Walls bounce ripples back from the edges.</p>
   </section>
   <section>
-    <h3>Rain</h3>
-    <div class="row"><label for="rain">Drops / second</label><output for="rain"></output><input id="rain" type="range" min="0" max="8" step="0.1"></div>
+    <h3>Wave sets</h3>
+    <div class="row"><label for="sets">Sets / minute</label><output for="sets"></output><input id="sets" type="range" min="0" max="20" step="0.5"></div>
+    <div class="row"><label for="waveHeight">Height</label><output for="waveHeight"></output><input id="waveHeight" type="range" min="0" max="2" step="0.01"></div>
+    <div class="row"><label for="wavelength">Wavelength</label><output for="wavelength"></output><input id="wavelength" type="range" min="0.03" max="0.25" step="0.005"></div>
+    <div class="row"><label for="setLength">Set length</label><output for="setLength"></output><input id="setLength" type="range" min="0.2" max="2" step="0.05"></div>
+    <p class="hint-text">Trains of waves roll in from somewhere off screen. Where two sets cross, the light knots into a web. Wavelength = distance between crests (longer makes wider, softer bands).</p>
+  </section>
+  <section>
+    <h3>Stirred water</h3>
+    <div class="row"><label for="churn">Churn</label><output for="churn"></output><input id="churn" type="range" min="0" max="2" step="0.01"></div>
+    <div class="row"><label for="size">Size</label><output for="size"></output><input id="size" type="range" min="0.02" max="0.25" step="0.005"></div>
+    <div class="row"><label for="wake">Wake</label><output for="wake"></output><input id="wake" type="range" min="0" max="2" step="0.01"></div>
+    <div class="row"><label for="drift">Drift</label><output for="drift"></output><input id="drift" type="range" min="0" max="2" step="0.01"></div>
+    <p class="hint-text">A patch of broken, choppy water that wanders around. Drag to move it and stir; Wake = how much water your drag pushes. Drift 0 keeps it still.</p>
   </section>
   <section class="actions">
-    <button type="button" id="drop">Drop</button>
-    <button type="button" id="splash">Splash</button>
     <button type="button" id="still">Still water</button>
     <button type="button" id="reset">Reset</button>
     <button type="button" id="copy" class="primary">Copy settings</button>
@@ -114,8 +122,9 @@
   const COUNTS = [125000, 250000, 500000, 1000000, 1500000, 2000000];
   const DEFAULTS = {
     particles: touch ? 1 : 3, brightness: 0.45, depth: 0.9, grain: 0.85, afterglow: 0.6,
-    dropSize: 0.025, dropStrength: 1, speed: 1, calm: 0.35, swell: 0.25, walls: false,
-    rain: reduceMotion ? 0.3 : 1.2,
+    speed: 1, calm: 0.6, swell: 0.15, walls: false,
+    sets: 6, waveHeight: 1, wavelength: 0.09, setLength: 0.8,
+    churn: 1, size: 0.1, wake: 0.6, drift: reduceMotion ? 0.15 : 0.4,
   };
   const S = { ...DEFAULTS };
 
@@ -134,12 +143,19 @@
   void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
 
   // Height field: r = height, g = velocity. A classic "average of neighbours" wave step,
-  // plus up to 8 drops per pass, plus a sponge at the edges when the walls are off.
+  // plus a moving "stirrer" that pushes the water up and down and churns it, and a sponge at the edges when the walls are off.
   const SIM_FS = `#version 300 es
   precision highp float;
   in vec2 vUv; out vec4 o;
   uniform sampler2D uState; uniform vec2 uTexel; uniform float uDamp; uniform float uWalls; uniform float uAspect;
-  uniform int uDropCount; uniform vec4 uDrops[8]; // x, y (uv), radius (screen heights), amplitude
+  uniform vec4 uStir; // x, y (uv), radius (screen heights), unused
+  uniform vec2 uMove; // how far the patch moved this step (screen heights) * wake strength
+  uniform float uChurn; uniform float uTime; uniform vec4 uKick; // fresh random angles/phases every step
+  float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + 1.0), f.x), f.y);
+  }
   void main() {
     vec4 s = texture(uState, vUv);
     float avg = (texture(uState, vUv - vec2(uTexel.x, 0.0)).r + texture(uState, vUv + vec2(uTexel.x, 0.0)).r +
@@ -150,13 +166,18 @@
     s.g *= uDamp * mix(sponge, 1.0, uWalls);
     s.r += s.g;
     s.r *= mix(mix(sponge, 1.0, 0.6), 1.0, uWalls);
-    for (int i = 0; i < 8; i++) {
-      if (i >= uDropCount) break;
-      vec4 d = uDrops[i];
-      vec2 q = (vUv - d.xy) * vec2(uAspect, 1.0);
-      float t = length(q) / d.z;
-      if (t < 1.0) s.r += d.w * (0.5 + 0.5 * cos(3.14159265 * t));
-    }
+    vec2 q = (vUv - uStir.xy) * vec2(uAspect, 1.0);
+    float d2 = dot(q, q) / (uStir.z * uStir.z);
+    // wake: push water ahead of the moving patch, pull it from behind
+    s.g += dot(q, uMove) / (uStir.z * uStir.z) * exp(-d2 * 2.0) * 6.0;
+    // churn: flowing noise kicks around the stirrer -> broken, choppy water
+    // new noise every step (no steady push), so it chops the surface instead of lifting it
+    // three short waves in random directions: lots of chop, but no large-scale lift
+    float n = cos(dot(q, vec2(cos(uKick.x), sin(uKick.x))) * 120.0 + uKick.w)
+            + cos(dot(q, vec2(cos(uKick.y), sin(uKick.y))) * 160.0 + uKick.w * 1.7)
+            + cos(dot(q, vec2(cos(uKick.z), sin(uKick.z))) * 210.0 + uKick.w * 2.3);
+    float area = exp(-d2) * (0.5 + vnoise(q / uStir.z * 1.5 + uTime * 0.4));
+    s.g += uChurn * n * area;
     o = s;
   }`;
 
@@ -166,6 +187,7 @@
   precision highp float;
   uniform sampler2D uState; uniform vec2 uTexel; uniform vec2 uGrid; uniform float uJitter; uniform float uAspect;
   uniform float uDepth; uniform float uHeight; uniform float uSwell; uniform float uTime; uniform float uSeed;
+  uniform int uSetCount; uniform vec4 uSetA[6]; uniform vec4 uSetB[6]; // A: source x, y, start time, slope   B: k, length, speed, -
   uint hash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
   vec2 swellGrad(vec2 p) {
     // a few slow travelling waves, in screen-height units
@@ -192,6 +214,17 @@
     vec2 grad = vec2(hx / (2.0 * uTexel.x * uAspect), hy / (2.0 * uTexel.y)) * uHeight;
     vec2 p = uv * vec2(uAspect, 1.0);
     grad += swellGrad(p) * uSwell * 0.006;
+    // wave sets: a packet of crests travelling out from a far-away point
+    for (int i = 0; i < 6; i++) {
+      if (i >= uSetCount) break;
+      vec4 a = uSetA[i], b = uSetB[i];
+      vec2 d = p - a.xy; float r = length(d);
+      float front = b.z * (uTime - a.z);
+      float u = (front - r) / b.y;              // 0 at the leading crest, 1 at the tail
+      if (u <= 0.0 || u >= 1.0) continue;
+      float env = sin(3.14159265 * u); env *= env;
+      grad += a.w * env * cos(b.x * (r - front)) * d / r;
+    }
     vec3 n = normalize(vec3(-grad, 1.0));
     vec3 r = refract(vec3(0.0, 0.0, -1.0), n, 1.0 / 1.333);
     vec2 hit = p + r.xy / -r.z * uDepth;
@@ -267,33 +300,48 @@
   new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, sim ? 120 : 0); }).observe(canvas);
   resize();
 
-  // ---------- drops ----------
-  const pending = []; // {x, y (uv, y up), r, a, at}
+  // ---------- the stirrer ----------
+  // Wanders on a slow looping path; while you drag, it follows your finger instead.
   const now = () => performance.now() / 1000;
-  function drop(x = Math.random(), y = Math.random(), scale = 0.7 + Math.random() * 0.6, at = now()) {
-    pending.push({ x, y, r: S.dropSize * scale, a: S.dropStrength * 0.6 * (0.6 + 0.4 * scale), at });
+  const stir = { x: 0, y: 0, tx: 0, ty: 0, wander: Math.random() * 100, drag: false };
+  // wave sets: up to 6 at a time, each from a random point well outside the screen
+  const sets = [], setA = new Float32Array(24), setB = new Float32Array(24);
+  let nextSet = 0;
+  [stir.x, stir.y] = pathAt(stir.wander); [stir.tx, stir.ty] = [stir.x, stir.y];
+  function addSet(t, head = 0) {
+    const ang = Math.random() * Math.PI * 2, dist = 1.3 + Math.random() * 1.2;
+    const sx = aspect / 2 + Math.cos(ang) * dist * Math.max(aspect, 1), sy = 0.5 + Math.sin(ang) * dist;
+    const lambda = S.wavelength * (0.75 + Math.random() * 0.5), k = (Math.PI * 2) / lambda;
+    const c = 0.22 * (0.85 + Math.random() * 0.3);
+    const near = Math.hypot(sx - aspect / 2, sy - 0.5) - Math.hypot(aspect, 1) / 2; // distance to the screen
+    sets.push({ sx, sy, t0: t - (near + head) / c, slope: 0.06 * (0.7 + Math.random() * 0.6), k, L: S.setLength * (0.7 + Math.random() * 0.6), c, far: near + Math.hypot(aspect, 1) });
+    if (sets.length > 6) sets.shift();
   }
-  function splash(x = 0.2 + Math.random() * 0.6, y = 0.2 + Math.random() * 0.6) {
-    const t0 = now();
-    for (let i = 0; i < 28; i++) {
-      const ang = Math.random() * Math.PI * 2, rad = Math.sqrt(Math.random()) * 0.11;
-      drop(x + Math.cos(ang) * rad / aspect, y + Math.sin(ang) * rad, 0.35 + Math.random() * 0.5, t0 + Math.random() * 1.4);
-    }
-  }
+  function pathAt(t) { return [0.5 + 0.38 * Math.sin(t * 0.23 + 1.3) * Math.cos(t * 0.07), 0.5 + 0.36 * Math.sin(t * 0.17)]; }
   function stillWater() { for (const t of sim) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); } }
 
   // ---------- loop ----------
-  let last = now(), stepDebt = 0, time = 0, seed = 0;
-  const dropBuf = new Float32Array(32);
+  let last = now(), stepDebt = 0, time = 0, waveTime = 0, seed = 0;
+  // two sets already crossing the screen when the page opens
+  addSet(0, 0.9); addSet(0, 0.4); nextSet = 3;
+  let warm = 360; // run the waves ahead on the first frames so the light is already moving
   function frame() {
     const t = now(), dt = Math.min(0.05, t - last); last = t;
     const motion = reduceMotion ? 0.35 : 1;
-    time += dt * motion;
-    if (Math.random() < S.rain * dt) drop();
+    time += dt * motion; waveTime += dt * motion * S.speed;
+    stir.wander += dt * S.drift * motion;
+    if (!stir.drag) [stir.tx, stir.ty] = pathAt(stir.wander);
+    const ease = Math.min(1, dt * (stir.drag ? 10 : 2));
+    const px = stir.x, py = stir.y;
+    stir.x += (stir.tx - stir.x) * ease; stir.y += (stir.ty - stir.y) * ease;
+    const mvx = (stir.x - px) * aspect, mvy = stir.y - py;
+    if (S.sets > 0 && waveTime >= nextSet) { addSet(waveTime); nextSet = waveTime + (60 / S.sets) * (0.6 + Math.random() * 0.8); }
+    for (let i = sets.length - 1; i >= 0; i--) { const w = sets[i]; if (w.c * (waveTime - w.t0) - w.L > w.far + 0.5) sets.splice(i, 1); }
 
     // wave steps: ~90 per second at speed 1, independent of frame rate
     stepDebt += dt * 90 * S.speed * motion;
     let steps = Math.min(8, Math.floor(stepDebt)); stepDebt -= steps; if (steps === 8) stepDebt = 0;
+    if (warm > 0) { const w = Math.min(warm, 60); warm -= w; steps += w; }
     const damp = 1 - (0.0015 + S.calm * 0.02);
     gl.disable(gl.BLEND);
     gl.useProgram(simP.p);
@@ -303,16 +351,13 @@
     gl.uniform1f(simP.u.uWalls, S.walls ? 1 : 0);
     gl.uniform1f(simP.u.uAspect, aspect);
     gl.activeTexture(gl.TEXTURE0); gl.uniform1i(simP.u.uState, 0);
+    gl.uniform1f(simP.u.uChurn, S.churn * 0.004 * motion);
+    gl.uniform1f(simP.u.uTime, time);
+    gl.uniform4f(simP.u.uStir, stir.x, stir.y, S.size, 0);
+    const per = steps && stir.drag ? S.wake / steps : 0; // only your drag leaves a wake
+    gl.uniform2f(simP.u.uMove, mvx * per, mvy * per);
     for (let i = 0; i < steps; i++) {
-      let n = 0;
-      if (i === 0) {
-        for (let k = pending.length - 1; k >= 0 && n < 8; k--) {
-          const d = pending[k]; if (d.at > t) continue;
-          dropBuf.set([d.x, d.y, d.r, d.a], n * 4); n++; pending.splice(k, 1);
-        }
-      }
-      gl.uniform1i(simP.u.uDropCount, n);
-      if (n) gl.uniform4fv(simP.u.uDrops, dropBuf);
+      gl.uniform4f(simP.u.uKick, Math.random() * 6.283, Math.random() * 6.283, Math.random() * 6.283, Math.random() * 6.283);
       gl.bindTexture(gl.TEXTURE_2D, sim[0].tex);
       gl.bindFramebuffer(gl.FRAMEBUFFER, sim[1].fb);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -341,8 +386,11 @@
     gl.uniform1f(photonP.u.uDepth, S.depth);
     gl.uniform1f(photonP.u.uHeight, 0.012);
     gl.uniform1f(photonP.u.uSwell, S.swell);
-    gl.uniform1f(photonP.u.uTime, time);
+    gl.uniform1f(photonP.u.uTime, waveTime);
     gl.uniform1f(photonP.u.uSeed, seed);
+    gl.uniform1i(photonP.u.uSetCount, sets.length);
+    sets.forEach((w, i) => { setA.set([w.sx, w.sy, w.t0, w.slope * S.waveHeight], i * 4); setB.set([w.k, w.L, w.c, 0], i * 4); });
+    if (sets.length) { gl.uniform4fv(photonP.u.uSetA, setA); gl.uniform4fv(photonP.u.uSetB, setB); }
     gl.uniform1f(photonP.u.uWeight, (W * H * area) / (cols * rows) * (1 - keep));
     gl.drawArrays(gl.POINTS, 0, cols * rows);
     gl.disable(gl.BLEND);
@@ -356,20 +404,18 @@
     requestAnimationFrame(frame);
   }
 
-  // a few drops and a splash so the first second isn't empty
-  for (let i = 0; i < 4; i++) drop(Math.random(), Math.random(), 1, now() + i * 0.5);
-  splash(0.72, 0.3);
   requestAnimationFrame(frame);
 
   // ---------- input ----------
-  canvas.addEventListener('pointerdown', (e) => {
-    const r = canvas.getBoundingClientRect();
-    drop((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height, 1.1);
-  });
+  const toUv = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height]; };
+  canvas.addEventListener('pointerdown', (e) => { stir.drag = true; [stir.tx, stir.ty] = toUv(e); canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing'; });
+  canvas.addEventListener('pointermove', (e) => { if (stir.drag) [stir.tx, stir.ty] = toUv(e); });
+  const release = () => { stir.drag = false; canvas.style.cursor = ''; };
+  canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
 
   // ---------- panel ----------
-  const fmt = { particles: (v) => (COUNTS[v] >= 1e6 ? COUNTS[v] / 1e6 + 'M' : COUNTS[v] / 1e3 + 'K'), dropSize: (v) => (+v).toFixed(3), rain: (v) => (+v).toFixed(1) };
-  const sliders = ['particles', 'brightness', 'depth', 'grain', 'afterglow', 'dropSize', 'dropStrength', 'speed', 'calm', 'swell', 'rain'];
+  const fmt = { particles: (v) => (COUNTS[v] >= 1e6 ? COUNTS[v] / 1e6 + 'M' : COUNTS[v] / 1e3 + 'K'), wavelength: (v) => (+v).toFixed(3), sets: (v) => (+v).toFixed(1) };
+  const sliders = ['particles', 'brightness', 'depth', 'grain', 'afterglow', 'speed', 'calm', 'swell', 'sets', 'waveHeight', 'wavelength', 'setLength', 'churn', 'size', 'wake', 'drift'];
   const sync = () => {
     for (const id of sliders) {
       document.getElementById(id).value = S[id];
@@ -379,9 +425,7 @@
   };
   for (const id of sliders) document.getElementById(id).addEventListener('input', (e) => { S[id] = +e.target.value; sync(); });
   document.getElementById('walls').addEventListener('change', (e) => { S.walls = e.target.checked; });
-  document.getElementById('drop').addEventListener('click', () => drop(Math.random(), Math.random(), 1.2));
-  document.getElementById('splash').addEventListener('click', () => splash());
-  document.getElementById('still').addEventListener('click', () => { pending.length = 0; stillWater(); });
+  document.getElementById('still').addEventListener('click', stillWater);
   document.getElementById('reset').addEventListener('click', () => { Object.assign(S, DEFAULTS); sync(); });
   document.getElementById('copy').addEventListener('click', async () => {
     const line = 'Caustics settings: ' + JSON.stringify(S);
@@ -392,7 +436,7 @@
   const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
   tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
   sync();
-  window.caustics = { S, drop, splash };
+  window.caustics = { S, stir };
 })();
 </script>
 <script type="module" src="/assets/js/exp-notes.js"></script>

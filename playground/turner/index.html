@@ -320,7 +320,9 @@
     vec4 L = texture(uLight, vUv);
     if (uMode == 0) {
       // the painting lies on the pool floor; the light that lands there lights it
-      vec3 img = mix(texture(uImageA, (vUv - 0.5) / uCoverA + 0.5).rgb, texture(uImage, (vUv - 0.5) / uCover + 0.5).rgb, smoothstep(0.0, 1.0, uMix));
+      vec2 ia = (vUv - 0.5) / uCoverA + 0.5, ib = (vUv - 0.5) / uCover + 0.5;
+      float ina = step(0.0, ia.y) * step(ia.y, 1.0), inb = step(0.0, ib.y) * step(ib.y, 1.0);
+      vec3 img = mix(texture(uImageA, ia).rgb * ina, texture(uImage, ib).rgb * inb, smoothstep(0.0, 1.0, uMix));
       img = mix(vec3(dot(img, vec3(0.2126, 0.7152, 0.0722))), img, uTint);
       vec3 c = 1.0 - exp(-img * L.r * uBright * 2.4);
       o = vec4(pow(c, vec3(1.2)), 1.0);
@@ -466,7 +468,13 @@
     burst(hitAt[0], hitAt[1], 45);
     sync();
   }
-  const coverOf = (sc) => (aspect > sc.aspect ? [1, aspect / sc.aspect] : [sc.aspect / aspect, 1]); // screen uv per image uv
+  // How big the painting is on screen (image uv = (screen uv - 0.5) / fit + 0.5).
+  // Landscape screens: fill the screen. Portrait screens (phones): show the whole painting across the width, a little enlarged.
+  const coverOf = (sc) => {
+    if (aspect >= 1) return aspect > sc.aspect ? [1, aspect / sc.aspect] : [sc.aspect / aspect, 1];
+    const z = 1.12;
+    return [z, z * aspect / sc.aspect];
+  };
 
   // =====================================================================
   // SCORE — where and when bursts land. Places: 1–4 corners, 5 middle, 6–9 walls.
@@ -600,7 +608,7 @@
       gl.uniform1f(dotP.u.uSeed, clock * 60);
       const dotPx = 3.2 * Math.min(2, window.devicePixelRatio || 1) / Math.min(2, window.devicePixelRatio || 1); // ~3 CSS px
       gl.uniform1f(dotP.u.uSize, dotPx);
-      gl.uniform1f(dotP.u.uWeight, Math.min(1.6, (W * H) / dotCount / (dotPx * dotPx * 0.45) * 0.55) * (1 - keep));
+      gl.uniform1f(dotP.u.uWeight, Math.min(1.6, (W * H) * cover[0] * cover[1] / dotCount / (dotPx * dotPx * 0.45) * 0.55) * (1 - keep));
       gl.drawArrays(gl.POINTS, 0, dotCount);
       gl.bindVertexArray(emptyVao);
     } else {

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chord Synth — Playground — Kailan Huang</title>
+<meta name="description" content="A small synthesizer you can see inside: every note of a chord drawn as its own wave, the sum the speaker plays, the spectrum, the filter and the envelope, with the maths beside them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
+<style>
+  /* a dark synth faceplate: screens on top, modules in the middle, chord pads at the bottom */
+  :root {
+    color-scheme: dark;
+    --bg: #0b0b0c; --panel: #131315; --screen: #070708; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --accent: #b9a8ff;
+    --v1: #b9a8ff; --v2: #e8c48a; --v3: #7fc7c0; --v4: #e8907a; --v5: #9fb8e8;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.5 "Open Sans", -apple-system, sans-serif; min-height: 100vh; }
+  .mono, .lbl { font: 11px/1.4 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  button { font: inherit; color: inherit; }
+  button:focus-visible, [role="slider"]:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .bar { display: flex; align-items: center; gap: 16px; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+  .wrap { padding: 8px max(16px, env(safe-area-inset-right, 0px)) 32px max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 12px; max-width: 1400px; margin: 0 auto; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+  .card h2 { font: 11px "DM Mono", ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 400; margin-bottom: 10px;
+             display: flex; justify-content: space-between; gap: 8px; }
+  .card h2 span { color: var(--mute); }
+  canvas { display: block; width: 100%; background: var(--screen); border-radius: 4px; }
+
+  .screens { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+  .screens .side { display: grid; gap: 12px; }
+  #math { height: 340px; }
+  #scope, #spectrum { height: 150px; }
+  .formula { margin-top: 10px; display: grid; gap: 4px; font: 12px/1.6 "DM Mono", ui-monospace, monospace; color: var(--mute); }
+  .formula b { color: var(--ink); font-weight: 400; }
+  .ratios { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font: 12px "DM Mono", ui-monospace, monospace; }
+  .ratios span { white-space: nowrap; }
+
+  .modules { display: grid; grid-template-columns: 1fr 1.2fr 1.2fr 1fr; gap: 12px; }
+  .knobs { display: flex; flex-wrap: wrap; gap: 14px 10px; }
+  .knob { display: grid; justify-items: center; gap: 4px; width: 62px; user-select: none; touch-action: none; cursor: ns-resize; }
+  .knob svg { width: 52px; height: 52px; }
+  .knob .val { font: 11px "DM Mono", ui-monospace, monospace; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .waves { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px; }
+  .waves button { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 6px 2px 4px; cursor: pointer; color: var(--mute); display: grid; justify-items: center; gap: 2px; }
+  .waves button svg { width: 36px; height: 18px; }
+  .waves button span { font: 10px "DM Mono", ui-monospace, monospace; letter-spacing: .04em; text-transform: uppercase; }
+  .waves button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); }
+  .mod-screen { height: 90px; margin-bottom: 12px; }
+
+  .pads { display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 8px; align-items: stretch; }
+  .pad { background: #1b1b1e; border: 1px solid var(--line); border-radius: 8px; padding: 14px 10px; cursor: pointer; text-align: left; display: grid; gap: 4px; touch-action: none; user-select: none; }
+  .pad b { font: 400 26px/1 "Newsreader", Georgia, serif; }
+  .pad .mono { text-transform: none; letter-spacing: .02em; }
+  .pad .key { justify-self: end; margin-top: -26px; }
+  .pad.on { border-color: var(--accent); background: #221f2e; }
+  .pad-opts { display: grid; gap: 8px; align-content: center; min-width: 120px; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+  .switch input { appearance: none; width: 34px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; flex: none; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .switch input:checked { background: var(--accent); }
+  .switch input:checked::after { transform: translateX(14px); }
+  .hint { color: var(--mute); font-size: 12px; }
+
+  @media (max-width: 980px) {
+    .screens { grid-template-columns: 1fr; }
+    .modules { grid-template-columns: 1fr 1fr; }
+    #math { height: 300px; }
+  }
+  @media (max-width: 600px) {
+    .modules { grid-template-columns: 1fr; }
+    /* phones: the pads stay at the bottom of the screen, so the waves are in view while you play */
+    .chords { position: sticky; bottom: 0; z-index: 5; border-radius: 8px 8px 0 0; padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+              box-shadow: 0 -12px 24px var(--bg); }
+    .chords h2 { margin-bottom: 6px; }
+    .pads { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .pad { padding: 12px 4px; text-align: center; }
+    .pad .mono, .pad .key { display: none; }
+    .pad b { font-size: 22px; }
+    .pad-opts { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 16px; min-width: 0; }
+    #math { height: 280px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .switch input::after { transition: none; } }
+</style>
+</head>
+<body>
+<div class="bar top">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <h1 class="crumb-here">Chord Synth</h1>
+  </nav>
+</div>
+
+<main class="wrap">
+  <section class="screens">
+    <div class="card">
+      <h2>Inside the chord <span id="mathTag">slowed down ×1000</span></h2>
+      <canvas id="math" aria-label="Each note of the chord drawn as its own wave, and their sum at the bottom"></canvas>
+      <div class="ratios" id="ratios"></div>
+      <div class="formula" id="formula"></div>
+    </div>
+    <div class="side">
+      <div class="card">
+        <h2>Oscilloscope <span>what the speaker plays</span></h2>
+        <canvas id="scope" aria-label="Live waveform of the sound"></canvas>
+      </div>
+      <div class="card">
+        <h2>Spectrum <span>which frequencies, how loud</span></h2>
+        <canvas id="spectrum" aria-label="Live frequency spectrum, with the chord's notes marked"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="modules">
+    <div class="card">
+      <h2>Oscillator</h2>
+      <div class="waves" role="group" aria-label="Wave shape" id="waves"></div>
+      <div class="knobs" id="k-osc"></div>
+    </div>
+    <div class="card">
+      <h2>Filter <span>low-pass</span></h2>
+      <canvas class="mod-screen" id="filterView" aria-label="Filter frequency response"></canvas>
+      <div class="knobs" id="k-filter"></div>
+    </div>
+    <div class="card">
+      <h2>Envelope <span>volume over time</span></h2>
+      <canvas class="mod-screen" id="envView" aria-label="Envelope shape"></canvas>
+      <div class="knobs" id="k-env"></div>
+    </div>
+    <div class="card">
+      <h2>Space &amp; out</h2>
+      <div class="knobs" id="k-out"></div>
+      <p class="hint" style="margin-top:12px">Turn a knob by dragging up or down, or focus it and use the arrow keys.</p>
+    </div>
+  </section>
+
+  <section class="card chords">
+    <h2>Chords <span>hold a pad · keys 1–5</span></h2>
+    <div class="pads" id="pads">
+      <div class="pad-opts">
+        <label class="switch mono" for="roll">Roll <input id="roll" type="checkbox" role="switch" checked></label>
+        <label class="switch mono" for="latch">Latch <input id="latch" type="checkbox" role="switch"></label>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+  // ---------------------------------------------------------------------------------------------
+  // SETTINGS
+  // ---------------------------------------------------------------------------------------------
+  const S = {
+    wave: 'sawtooth', detune: 12, octave: 0,
+    cutoff: 1400, resonance: 1.5, envAmt: 2400,
+    attack: 0.03, decay: 0.6, sustain: 0.55, release: 2.2,
+    space: 0.45, volume: 0.6,
+  };
+  const CHORDS = [
+    { name: 'Am', notes: [45, 52, 57, 60, 64] },
+    { name: 'F',  notes: [41, 48, 53, 57, 60] },
+    { name: 'C',  notes: [48, 55, 60, 64, 67] },
+    { name: 'G',  notes: [43, 50, 55, 59, 62] },
+    { name: 'Em', notes: [40, 47, 52, 55, 59] },
+  ];
+  const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  const noteName = (m) => NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const VCOL = ['--v1', '--v2', '--v3', '--v4', '--v5'].map(css);
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------------------------------------------------------------------------------------------
+  // AUDIO — the browser's Web Audio: modules joined by cables, like a modular synth
+  //   oscillator ×2 (detuned) → low-pass filter → amp (envelope) → pan → dry + reverb → compressor → speaker
+  // ---------------------------------------------------------------------------------------------
+  let ac = null, master, dry, wet, verb, analyser, freqData, timeData;
+  function room(sec) {
+    const len = Math.floor(ac.sampleRate * sec), b = ac.createBuffer(2, len, ac.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+    return b;
+  }
+  function startAudio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ac = new AC();
+    try { const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='); a.loop = true; a.play().catch(() => {}); } catch {}
+    master = ac.createGain(); master.gain.value = S.volume;
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
+    analyser = ac.createAnalyser(); analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0.75;
+    freqData = new Float32Array(analyser.frequencyBinCount); timeData = new Float32Array(analyser.fftSize);
+    master.connect(comp); comp.connect(analyser); analyser.connect(ac.destination);
+    dry = ac.createGain(); wet = ac.createGain(); verb = ac.createConvolver(); verb.buffer = room(4.5);
+    dry.connect(master); wet.connect(verb); verb.connect(master);
+    setOut();
+  }
+  function setOut() { if (!ac) return; master.gain.value = S.volume; dry.gain.value = 1 - 0.5 * S.space; wet.gain.value = 0.15 + 0.85 * S.space; }
+
+  // every sounding note: its nodes plus the times the drawings need
+  const voices = []; // { midi, i, on, off, oscs, filt, amp }
+  function noteOn(midi, i, t0) {
+    const oscs = [], filt = ac.createBiquadFilter(), amp = ac.createGain(), pan = ac.createStereoPanner();
+    filt.type = 'lowpass';
+    const f = mtof(midi + 12 * S.octave);
+    for (const sign of [-1, 1]) {
+      const o = ac.createOscillator(); o.type = S.wave; o.frequency.value = f; o.detune.value = sign * S.detune / 2;
+      o.connect(filt); o.start(t0); oscs.push(o);
+    }
+    const peak = 0.16, a = S.attack, d = S.decay, s = S.sustain;
+    amp.gain.setValueAtTime(0, t0);
+    amp.gain.linearRampToValueAtTime(peak, t0 + a);
+    amp.gain.setTargetAtTime(peak * s, t0 + a, d / 3);
+    filt.Q.value = S.resonance;
+    filt.frequency.setValueAtTime(S.cutoff, t0);
+    filt.frequency.linearRampToValueAtTime(Math.min(16000, S.cutoff + S.envAmt), t0 + a);
+    filt.frequency.setTargetAtTime(S.cutoff + S.envAmt * s, t0 + a, d / 3);
+    pan.pan.value = (i - 2) * 0.22;
+    filt.connect(amp); amp.connect(pan); pan.connect(dry); pan.connect(wet);
+    const v = { midi, i, on: t0, off: Infinity, oscs, filt, amp, a, d, s, r: S.release, wave: S.wave, det: S.detune, oct: S.octave };
+    voices.push(v);
+    return v;
+  }
+  function noteOff(v, t) {
+    if (v.off !== Infinity) return;
+    v.off = t; v.r = S.release;
+    v.amp.gain.cancelScheduledValues(t); v.amp.gain.setValueAtTime(envAt(v, t) * 0.16, t);
+    v.amp.gain.setTargetAtTime(0, t, v.r / 4);
+    v.filt.frequency.cancelScheduledValues(t);
+    v.filt.frequency.setTargetAtTime(S.cutoff, t, v.r / 4);
+    v.oscs.forEach((o) => o.stop(t + v.r * 1.6 + 0.1));
+    setTimeout(() => { const k = voices.indexOf(v); if (k >= 0) voices.splice(k, 1); }, (v.r * 1.6 + 0.4) * 1000);
+  }
+  // the envelope as maths (0–1), the same curve the amp follows, so the drawings match what you hear
+  function envAt(v, t) {
+    const dt = t - v.on; if (dt < 0) return 0;
+    let level;
+    if (dt < v.a) level = dt / v.a;
+    else level = v.s + (1 - v.s) * Math.exp(-(dt - v.a) / (v.d / 3));
+    if (t > v.off) {
+      const at = Math.min(v.off - v.on, 999);
+      const lv = at < v.a ? at / v.a : v.s + (1 - v.s) * Math.exp(-(at - v.a) / (v.d / 3));
+      level = lv * Math.exp(-(t - v.off) / (v.r / 4));
+    }
+    return level;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // PADS
+  // ---------------------------------------------------------------------------------------------
+  const padsEl = document.getElementById('pads');
+  let held = null, lastChord = CHORDS[0];
+  CHORDS.forEach((c, k) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pad'; b.dataset.k = k;
+    b.innerHTML = `<b>${c.name}</b><span class="mono">${c.notes.map(noteName).join(' ')}</span><span class="mono key">${k + 1}</span>`;
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); press(k); });
+    b.addEventListener('pointerup', () => release(k));
+    b.addEventListener('pointercancel', () => release(k));
+    b.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); press(k); } });
+    b.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') release(k); });
+    padsEl.insertBefore(b, padsEl.lastElementChild);
+  });
+  const padEls = [...padsEl.querySelectorAll('.pad')];
+  function press(k) {
+    startAudio(); if (!ac) return;
+    const latch = document.getElementById('latch').checked;
+    if (held) { const was = held.k; releaseNow(); if (latch && was === k) return; }
+    const t0 = ac.currentTime + 0.01, roll = document.getElementById('roll').checked;
+    const c = CHORDS[k]; lastChord = c;
+    held = { k, vs: c.notes.map((m, i) => noteOn(m, i, t0 + (roll ? i * 0.06 : 0))) };
+    padEls.forEach((p, j) => p.classList.toggle('on', j === k));
+  }
+  function releaseNow() { if (!held) return; const t = ac.currentTime; held.vs.forEach((v) => noteOff(v, Math.max(t, v.on))); held = null; padEls.forEach((p) => p.classList.remove('on')); }
+  function release(k) { if (document.getElementById('latch').checked) return; if (held && held.k === k) releaseNow(); }
+  window.addEventListener('keydown', (e) => { const k = +e.key - 1; if (k >= 0 && k < 5 && !e.repeat && !e.metaKey && !e.ctrlKey) press(k); });
+  window.addEventListener('keyup', (e) => { const k = +e.key - 1; if (k >= 0 && k < 5) release(k); });
+
+  // ---------------------------------------------------------------------------------------------
+  // KNOBS — drag up/down, arrow keys, or the mouse wheel
+  // ---------------------------------------------------------------------------------------------
+  function knob(parent, key, label, min, max, { log = false, step = 0, fmt = (v) => v.toFixed(2) } = {}) {
+    const el = document.createElement('div');
+    el.className = 'knob'; el.tabIndex = 0; el.setAttribute('role', 'slider'); el.setAttribute('aria-label', label);
+    el.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><path d="" fill="none" stroke="${css('--line')}" stroke-width="4" stroke-linecap="round" class="track"/>
+      <path d="" fill="none" stroke="${css('--accent')}" stroke-width="4" stroke-linecap="round" class="arc"/><line x1="26" y1="26" x2="26" y2="10" stroke="${css('--ink')}" stroke-width="2" stroke-linecap="round" class="needle"/></svg>
+      <span class="val"></span><span class="lbl">${label}</span>`;
+    parent.append(el);
+    const toN = (v) => (log ? Math.log(v / min) / Math.log(max / min) : (v - min) / (max - min));
+    const fromN = (n) => { n = Math.min(1, Math.max(0, n)); let v = log ? min * Math.pow(max / min, n) : min + n * (max - min); if (step) v = Math.round(v / step) * step; return v; };
+    const arc = (n) => { const a0 = -135, a1 = a0 + 270 * n, r = 20, p = (a) => [26 + r * Math.sin(a * Math.PI / 180), 26 - r * Math.cos(a * Math.PI / 180)];
+      const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0} ${y0} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`; };
+    el.querySelector('.track').setAttribute('d', arc(1));
+    const draw = () => {
+      const n = toN(S[key]); el.querySelector('.arc').setAttribute('d', arc(Math.max(0.001, n)));
+      el.querySelector('.needle').setAttribute('transform', `rotate(${-135 + 270 * n} 26 26)`);
+      el.querySelector('.val').textContent = fmt(S[key]);
+      el.setAttribute('aria-valuetext', fmt(S[key]));
+    };
+    const set = (v) => { S[key] = v; draw(); onChange(key); };
+    let y0 = 0, n0 = 0;
+    el.addEventListener('pointerdown', (e) => { el.setPointerCapture(e.pointerId); y0 = e.clientY; n0 = toN(S[key]); el.focus(); });
+    el.addEventListener('pointermove', (e) => { if (el.hasPointerCapture(e.pointerId)) set(fromN(n0 + (y0 - e.clientY) / 180)); });
+    el.addEventListener('keydown', (e) => {
+      const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (!d) return;
+      e.preventDefault(); set(fromN(toN(S[key]) + d * (e.shiftKey ? 0.1 : 0.02)));
+    });
+    el.addEventListener('wheel', (e) => { e.preventDefault(); set(fromN(toN(S[key]) - Math.sign(e.deltaY) * 0.02)); }, { passive: false });
+    draw();
+  }
+  const ms = (v) => (v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s');
+  const hz = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz');
+  knob(document.getElementById('k-osc'), 'detune', 'Detune', 0, 50, { step: 1, fmt: (v) => v + ' ¢' });
+  knob(document.getElementById('k-osc'), 'octave', 'Octave', -1, 1, { step: 1, fmt: (v) => (v > 0 ? '+' : '') + v });
+  knob(document.getElementById('k-filter'), 'cutoff', 'Cutoff', 80, 12000, { log: true, fmt: hz });
+  knob(document.getElementById('k-filter'), 'resonance', 'Resonance', 0.5, 18, { log: true, fmt: (v) => v.toFixed(1) });
+  knob(document.getElementById('k-filter'), 'envAmt', 'Env amt', 0, 8000, { fmt: hz });
+  knob(document.getElementById('k-env'), 'attack', 'Attack', 0.005, 3, { log: true, fmt: ms });
+  knob(document.getElementById('k-env'), 'decay', 'Decay', 0.02, 4, { log: true, fmt: ms });
+  knob(document.getElementById('k-env'), 'sustain', 'Sustain', 0, 1, { fmt: (v) => Math.round(v * 100) + '%' });
+  knob(document.getElementById('k-env'), 'release', 'Release', 0.02, 8, { log: true, fmt: ms });
+  knob(document.getElementById('k-out'), 'space', 'Space', 0, 1, { fmt: (v) => Math.round(v * 100) + '%' });
+  knob(document.getElementById('k-out'), 'volume', 'Volume', 0, 1, { fmt: (v) => Math.round(v * 100) + '%' });
+  function onChange(key) {
+    if (key === 'space' || key === 'volume') setOut();
+    if (!ac) return;
+    // knobs act on held notes too, like a real synth
+    const t = ac.currentTime;
+    for (const v of voices) {
+      if (key === 'detune') v.oscs.forEach((o, j) => o.detune.setTargetAtTime((j ? 1 : -1) * S.detune / 2, t, 0.02));
+      if (key === 'resonance') v.filt.Q.setTargetAtTime(S.resonance, t, 0.02);
+      if ((key === 'cutoff' || key === 'envAmt') && v.off === Infinity) v.filt.frequency.setTargetAtTime(S.cutoff + S.envAmt * envAt(v, t), t, 0.03);
+      if (key === 'detune') v.det = S.detune;
+    }
+  }
+
+  // wave buttons, each with a tiny drawing of its shape
+  const WAVES = [['sine', 'Sine'], ['triangle', 'Tri'], ['sawtooth', 'Saw'], ['square', 'Square']];
+  const shape = {   // one cycle, x in [0, 1) → –1…1
+    sine: (x) => Math.sin(2 * Math.PI * x),
+    triangle: (x) => 1 - 4 * Math.abs(x - Math.floor(x + 0.75) + 0.25),
+    sawtooth: (x) => 2 * (x - Math.floor(x + 0.5)),
+    square: (x) => (x - Math.floor(x) < 0.5 ? 1 : -1),
+  };
+  const wavesEl = document.getElementById('waves');
+  for (const [id, label] of WAVES) {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.w = id;
+    let d = ''; for (let i = 0; i <= 72; i++) { const x = i / 36; d += (i ? 'L' : 'M') + (i * 0.5).toFixed(1) + ' ' + (9 - 7 * shape[id](x)).toFixed(1); }
+    b.innerHTML = `<svg viewBox="0 0 36 18" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>${label}</span>`;
+    b.addEventListener('click', () => { S.wave = id; syncWaves(); if (ac) voices.forEach((v) => { v.oscs.forEach((o) => (o.type = id)); v.wave = id; }); });
+    wavesEl.append(b);
+  }
+  const syncWaves = () => wavesEl.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.w === S.wave)));
+  syncWaves();
+
+  // ---------------------------------------------------------------------------------------------
+  // DRAWING
+  // ---------------------------------------------------------------------------------------------
+  const cvs = {};
+  for (const id of ['math', 'scope', 'spectrum', 'filterView', 'envView']) {
+    const c = document.getElementById(id); cvs[id] = { c, x: c.getContext('2d'), w: 0, h: 0 };
+    new ResizeObserver(() => { const dpr = Math.min(2, devicePixelRatio || 1); const r = c.getBoundingClientRect(); c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); cvs[id].w = c.width; cvs[id].h = c.height; cvs[id].dpr = dpr; }).observe(c);
+  }
+  const ink = css('--ink'), mute = css('--mute'), line = css('--line'), accent = css('--accent');
+  const font = (px, dpr) => `${px * dpr}px "DM Mono", ui-monospace, monospace`;
+
+  // closest simple fraction, to show why some notes sound calm together (3/2, 5/4…)
+  function ratio(r) {
+    for (let q = 1; q <= 8; q++) { const p = Math.round(r * q); const cents = 1200 * Math.log2(r / (p / q)); if (Math.abs(cents) < 20) return { p, q, cents }; }
+    const p = Math.round(r * 8); return { p, q: 8, cents: 1200 * Math.log2(r / (p / 8)) };
+  }
+
+  let mathScroll = 0;
+  function drawMath(now) {
+    const { x: g, w, h, dpr } = cvs.math; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    // notes to show: sounding voices, else the last chord played (dim)
+    const t = ac ? ac.currentTime : 0;
+    let rows = voices.filter((v) => envAt(v, t) > 0.002).sort((a, b) => a.i - b.i);
+    const live = rows.length > 0;
+    if (!live) rows = lastChord.notes.map((m, i) => ({ midi: m, i, ghost: true, wave: S.wave, det: S.detune, oct: S.octave }));
+    // keep one row per chord tone (two of the same note? keep the newest)
+    const byI = new Map(); rows.forEach((v) => byI.set(v.i, v)); rows = [...byI.values()].sort((a, b) => a.i - b.i);
+    const n = rows.length, sumH = h * 0.3, rowH = (h - sumH - 10 * dpr) / Math.max(1, n);
+    const lowest = Math.min(...rows.map((v) => mtof(v.midi + 12 * v.oct)));
+    const span = 3 / lowest;                                   // three cycles of the lowest note
+    mathScroll += reduceMotion ? 0 : 0.001 * (1 / 60);         // real time slowed 1000×
+    const t0 = mathScroll;
+    const N = Math.max(200, Math.floor(w / (1.5 * dpr)));
+    const sum = new Float32Array(N + 1);
+    let sumAmp = 0;
+    rows.forEach((v, r) => {
+      const f = mtof(v.midi + 12 * v.oct), amp = v.ghost ? 0.35 : envAt(v, t), y0 = r * rowH + rowH / 2, A = rowH * 0.36;
+      const fn = shape[v.wave], dc = Math.pow(2, (v.det / 2) / 1200);
+      g.strokeStyle = VCOL[v.i % 5]; g.globalAlpha = v.ghost ? 0.35 : 0.35 + 0.65 * amp; g.lineWidth = 1.4 * dpr;
+      g.beginPath();
+      for (let k = 0; k <= N; k++) {
+        const tt = t0 + (k / N) * span;
+        const y = 0.5 * (fn(f / dc * tt) + fn(f * dc * tt));      // the two detuned oscillators
+        sum[k] += y * amp; if (k === 0) sumAmp += amp;
+        const py = y0 - y * A; k ? g.lineTo((k / N) * w, py) : g.moveTo(0, py);
+      }
+      g.stroke(); g.globalAlpha = 1;
+      g.font = font(10.5, dpr); g.textBaseline = 'top';
+      const lab = `${noteName(v.midi + 12 * v.oct)}  ${f.toFixed(1)} Hz`;
+      g.fillStyle = 'rgba(7,7,8,0.85)'; g.fillRect(3 * dpr, r * rowH + 2 * dpr, g.measureText(lab).width + 6 * dpr, 14 * dpr);
+      g.fillStyle = VCOL[v.i % 5]; g.fillText(lab, 6 * dpr, r * rowH + 3 * dpr);
+    });
+    // the sum: what the speaker actually moves
+    const ys = h - sumH / 2, peak = Math.max(1e-3, ...sum.map(Math.abs));
+    g.strokeStyle = line; g.lineWidth = dpr; g.beginPath(); g.moveTo(0, h - sumH - 4 * dpr); g.lineTo(w, h - sumH - 4 * dpr); g.stroke();
+    g.strokeStyle = ink; g.lineWidth = 2 * dpr; g.beginPath();
+    for (let k = 0; k <= N; k++) { const py = ys - (sum[k] / peak) * sumH * 0.4; k ? g.lineTo((k / N) * w, py) : g.moveTo(0, py); }
+    g.stroke();
+    g.fillStyle = ink; g.font = font(10.5, dpr);
+    g.fillText(`SUM  ${(span * 1000).toFixed(1)} ms shown`, 6 * dpr, h - sumH + 2 * dpr);
+    // side info
+    if (now - lastInfo > 250) { lastInfo = now; writeInfo(rows, live); }
+  }
+  let lastInfo = -1e9, infoKey = '';
+  function writeInfo(rows, live) {
+    const root = mtof(rows[0].midi + 12 * rows[0].oct);
+    const key = rows.map((v) => v.midi).join() + S.wave + S.detune + S.octave + live;
+    if (key === infoKey) return; infoKey = key;
+    document.getElementById('ratios').innerHTML = rows.map((v) => {
+      const f = mtof(v.midi + 12 * v.oct), q = ratio(f / root);
+      return `<span style="color:${VCOL[v.i % 5]}">${noteName(v.midi + 12 * v.oct)} = ${q.p}/${q.q} × root <span style="color:${mute}">${q.cents >= 0 ? '+' : ''}${q.cents.toFixed(0)}¢</span></span>`;
+    }).join('');
+    const F = {
+      sine: 'sin(2π·f·t)', triangle: '1 − 4·|f·t − ⌊f·t + ¾⌋ + ¼|', sawtooth: '2·(f·t − ⌊f·t + ½⌋)', square: 'sign(sin(2π·f·t))',
+    }[S.wave];
+    document.getElementById('formula').innerHTML = [
+      `<div>note → frequency: <b>f = 440 · 2^((n − 69) / 12)</b> &nbsp;e.g. A4 = n 69 = 440 Hz</div>`,
+      `<div>one oscillator (${S.wave}): <b>w(t) = ${F}</b></div>`,
+      `<div>detune pair: <b>½·[w(f·2^(−${S.detune / 2}/1200)·t) + w(f·2^(+${S.detune / 2}/1200)·t)]</b> → the slow “beating”</div>`,
+      `<div>the chord: <b>sum(t) = Σ envelopeᵢ(t) · voiceᵢ(t)</b> — simple ratios (3/2, 5/4) line up, so the sum repeats calmly. The ¢ beside each ratio is how far today’s equal-tempered tuning is from it.</div>`,
+    ].join('');
+    document.getElementById('mathTag').textContent = live ? 'live · slowed down ×1000' : 'last chord · hold a pad to play';
+  }
+
+  function drawScope() {
+    const { x: g, w, h, dpr } = cvs.scope; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = line; g.lineWidth = dpr; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    if (!ac) { label(g, 'press a chord to hear it', w, h, dpr); return; }
+    analyser.getFloatTimeDomainData(timeData);
+    // trigger: start at a rising zero crossing so the wave stands still
+    let s0 = 0; for (let i = 1; i < 2048; i++) if (timeData[i - 1] < 0 && timeData[i] >= 0) { s0 = i; break; }
+    const len = 1536, peak = Math.max(0.05, ...timeData.subarray(s0, s0 + len).map(Math.abs));
+    g.strokeStyle = accent; g.lineWidth = 1.6 * dpr; g.beginPath();
+    for (let i = 0; i < len; i++) { const x = (i / len) * w, y = h / 2 - (timeData[s0 + i] / peak) * h * 0.42; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+    g.fillStyle = mute; g.font = font(10, dpr); g.textBaseline = 'top';
+    g.fillText(`${(len / ac.sampleRate * 1000).toFixed(0)} ms · real time`, 6 * dpr, 4 * dpr);
+  }
+  const fMin = 30, fMax = 10000, fx = (f, w) => (Math.log(f / fMin) / Math.log(fMax / fMin)) * w;
+  function drawSpectrum() {
+    const { x: g, w, h, dpr } = cvs.spectrum; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = mute; g.font = font(9.5, dpr); g.textBaseline = 'bottom';
+    for (const f of [50, 100, 200, 500, 1000, 2000, 5000]) { const x = fx(f, w); g.fillStyle = line; g.fillRect(x, 0, dpr, h - 12 * dpr); g.fillStyle = mute; g.fillText(f >= 1000 ? f / 1000 + 'k' : f, x + 2 * dpr, h); }
+    if (!ac) { label(g, 'press a chord to hear it', w, h, dpr); return; }
+    analyser.getFloatFrequencyData(freqData);
+    const bin = ac.sampleRate / analyser.fftSize;
+    g.strokeStyle = accent; g.lineWidth = 1.4 * dpr; g.beginPath();
+    let first = true;
+    for (let i = 1; i < freqData.length; i++) {
+      const f = i * bin; if (f < fMin) continue; if (f > fMax) break;
+      const db = Math.max(-100, freqData[i]), y = (h - 14 * dpr) * (1 - (db + 100) / 85);
+      first ? g.moveTo(fx(f, w), y) : g.lineTo(fx(f, w), y); first = false;
+    }
+    g.stroke();
+    // mark each sounding note's fundamental
+    const t = ac.currentTime;
+    for (const v of voices) {
+      const e = envAt(v, t); if (e < 0.01) continue;
+      const x = fx(mtof(v.midi + 12 * v.oct), w);
+      g.fillStyle = VCOL[v.i % 5]; g.globalAlpha = Math.min(1, e * 2); g.fillRect(x - dpr, 2 * dpr, 2 * dpr, 8 * dpr); g.globalAlpha = 1;
+    }
+  }
+  const probe = { f: null };
+  function drawFilter() {
+    const { x: g, w, h, dpr } = cvs.filterView; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    if (!probe.f) { const tmp = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100); probe.f = tmp.createBiquadFilter(); probe.f.type = 'lowpass';
+      probe.freqs = new Float32Array(160).map((_, i) => fMin * Math.pow(fMax / fMin, i / 159)); probe.mag = new Float32Array(160); probe.ph = new Float32Array(160); }
+    // where the filter is now: the cutoff knob plus the envelope's push on the newest note
+    const t = ac ? ac.currentTime : 0, v = voices.filter((u) => envAt(u, t) > 0.002).at(-1);
+    const fc = Math.min(16000, S.cutoff + (v ? S.envAmt * envAt(v, t) : 0));
+    probe.f.frequency.value = fc; probe.f.Q.value = S.resonance;
+    probe.f.getFrequencyResponse(probe.freqs, probe.mag, probe.ph);
+    g.fillStyle = 'rgba(185,168,255,0.12)'; g.strokeStyle = accent; g.lineWidth = 1.5 * dpr; g.beginPath();
+    probe.freqs.forEach((f, i) => { const db = 20 * Math.log10(Math.max(1e-5, probe.mag[i])); const y = h * 0.55 - db * (h / 70); i ? g.lineTo(fx(f, w), y) : g.moveTo(fx(f, w), y); });
+    g.stroke(); g.lineTo(w, h); g.lineTo(0, h); g.closePath(); g.fill();
+    g.fillStyle = ink; g.font = font(10, dpr); g.textBaseline = 'top';
+    g.fillText(`cutoff ${hz(fc)}  ·  sounds above it fade out`, 6 * dpr, 4 * dpr);
+  }
+  function drawEnv() {
+    const { x: g, w, h, dpr } = cvs.envView; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    const a = S.attack, d = S.decay, s = S.sustain, r = S.release, holdT = Math.max(0.4, (a + d) * 0.5), total = a + d * 1.2 + holdT + r * 1.2;
+    const X = (tt) => 6 * dpr + (tt / total) * (w - 12 * dpr), Y = (lv) => h - 8 * dpr - lv * (h - 22 * dpr);
+    const fake = { on: 0, off: a + d * 1.2 + holdT, a, d, s, r };
+    g.strokeStyle = accent; g.lineWidth = 1.6 * dpr; g.beginPath();
+    for (let i = 0; i <= 200; i++) { const tt = (i / 200) * total; const y = Y(envAt(fake, tt)); i ? g.lineTo(X(tt), y) : g.moveTo(X(tt), y); }
+    g.stroke();
+    g.fillStyle = mute; g.font = font(9.5, dpr); g.textBaseline = 'top';
+    [['A', a / 2], ['D', a + d * 0.6], ['S', a + d * 1.2 + holdT / 2], ['R', fake.off + r * 0.5]].forEach(([k, tt]) => g.fillText(k, X(tt) - 3 * dpr, 2 * dpr));
+    // playhead: the newest note's place on the curve
+    if (ac) {
+      const t = ac.currentTime, v = voices.at(-1);
+      if (v && envAt(v, t) > 0.002) {
+        const el = t - v.on, tt = v.off === Infinity ? Math.min(el, a + d * 1.2 + holdT * 0.5) : fake.off + (t - v.off);
+        if (tt <= total) { g.fillStyle = ink; g.beginPath(); g.arc(X(tt), Y(envAt(v, t)), 3.5 * dpr, 0, 7); g.fill(); }
+      }
+    }
+  }
+  function label(g, s, w, h, dpr) { g.fillStyle = mute; g.font = font(11, dpr); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s.toUpperCase(), w / 2, h / 2); g.textAlign = 'left'; }
+
+  function frame(now) {
+    drawMath(now); drawScope(); drawSpectrum(); drawFilter(); drawEnv();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.synth = { S, press, releaseNow, get voices() { return voices; }, get ac() { return ac; } };
+})();
+</script>
+<script type="module" src="/assets/js/exp-notes.js"></script>
+</body>
+</html>

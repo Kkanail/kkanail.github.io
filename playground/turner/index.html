@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turner Underwater — Playground — Kailan Huang</title>
+<meta name="description" content="Light on the bottom of a pool: up to two million particles act as light rays, bent by a simulated water surface. Bursts of water land on a slow beat and the light folds into webs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
+<style>
+  :root { --bg: #000000; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #0e0e0f; --accent: #b9a8ff; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font: 15px/1.5 "Open Sans", -apple-system, sans-serif; }
+
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; cursor: crosshair; }
+  .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: var(--mute);
+              font: 12px/1.6 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+
+  .bar { position: fixed; left: 16px; right: 16px; top: 16px; z-index: 3; display: flex; align-items: center; gap: 16px; pointer-events: none; }
+  .bar > * { pointer-events: auto; }
+  .hint { position: fixed; left: 16px; bottom: 16px; z-index: 2; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em;
+          text-transform: uppercase; color: var(--mute); pointer-events: none; }
+
+  /* control panel (same layout as the Glass K lab) */
+  .panel { position: fixed; right: 16px; top: 64px; bottom: 16px; width: 280px; z-index: 3; overflow-y: auto;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+  .panel h3 { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 400; margin-bottom: 10px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+  .row + .row, .row + .switch, .switch + .row { margin-top: 12px; }
+  .row label { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .row output { font: 12px "DM Mono", ui-monospace, monospace; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); cursor: pointer; }
+  .switch input { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .2s; flex: none; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .switch input:checked { background: var(--accent); }
+  .switch input:checked::after { transform: translateX(16px); }
+  .hint-text { font-size: 12px; line-height: 1.5; color: var(--mute); margin-top: 8px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+  .actions button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+                    background: none; color: var(--ink); border-radius: 999px; padding: 9px 10px; cursor: pointer; }
+  .actions button:hover { border-color: var(--ink); }
+  .actions .primary { grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: #0e0e0f; }
+  .copied { grid-column: 1 / -1; font: 12px "DM Mono", ui-monospace, monospace; color: var(--accent); min-height: 1.4em; text-align: center; }
+  textarea.settings { grid-column: 1 / -1; width: 100%; font: 11px/1.5 "DM Mono", ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .scenes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+  .scenes button { font: 15px "Newsreader", Georgia, serif; border: 1px solid var(--line); background: none; color: var(--mute); border-radius: 4px; padding: 6px; cursor: pointer; }
+  .scenes button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+  .switch + .modes { margin-top: 12px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .modes button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+                  background: none; color: var(--mute); border-radius: 4px; padding: 9px 6px; cursor: pointer; }
+  .modes button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+  .file { display: block; margin-top: 12px; text-align: center; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+          border: 1px dashed var(--line); color: var(--ink); border-radius: 4px; padding: 9px 8px; cursor: pointer; }
+  .file:hover { border-color: var(--ink); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .toggle-panel { display: none; }
+  @media (max-width: 760px) {
+    .hint { bottom: 62px; }
+    .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 56vh; transform: translateY(calc(100% - 46px)); transition: transform .25s; gap: 18px; }
+    .panel.open { transform: none; }
+    .toggle-panel { display: block; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+                    background: none; border: 0; color: var(--ink); text-align: left; padding: 0 0 4px; cursor: pointer; }
+  }
+  @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="A Turner whaling painting seen through moving water. Bursts land on a slow beat; tap to make one yourself."></canvas>
+<div class="bar top">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <h1 class="crumb-here">Turner Underwater</h1>
+  </nav>
+</div>
+<p class="hint">Tap the water for a burst</p>
+
+<aside class="panel" id="panel" aria-label="Caustics settings">
+  <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
+  <section>
+    <h3>Painting</h3>
+    <div class="scenes" role="group" aria-label="Painting">
+      <button type="button" data-scene="0" aria-pressed="true">I</button>
+      <button type="button" data-scene="1" aria-pressed="false">II</button>
+      <button type="button" data-scene="2" aria-pressed="false">III</button>
+    </div>
+    <label class="switch" for="auto">Next painting each 12 bars <input id="auto" type="checkbox" role="switch"></label>
+    <div class="modes" role="group" aria-label="How the painting is drawn">
+      <button type="button" id="modeFloor" aria-pressed="true">On the floor</button>
+      <button type="button" id="modeDots" aria-pressed="false">As particles</button>
+    </div>
+    <div class="row"><label for="focus">Focus</label><output for="focus"></output><input id="focus" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="dots">Particles</label><output for="dots"></output><input id="dots" type="range" min="0" max="4" step="1"></div>
+    <div class="row"><label for="tint">Colour</label><output for="tint"></output><input id="tint" type="range" min="0" max="1" step="0.01"></div>
+    <p class="hint-text">Three paintings, three scenes. On the floor: the painting lies at the bottom of the pool and the light webs play over it. As particles: the painting is made of glowing dots, and the water bends each one; between scenes they scatter and gather into the next picture. Focus 0 leaves them in chaos.</p>
+  </section>
+  <section>
+    <h3>Score</h3>
+    <div class="row"><label for="bpm">Tempo (BPM)</label><output for="bpm"></output><input id="bpm" type="range" min="30" max="140" step="1"></div>
+    <label class="switch" for="random">Random places <input id="random" type="checkbox" role="switch"></label>
+    <p class="hint-text">Bursts land on the beat, in corners, against walls or in the middle, following a 12-bar score. One bar = 4 beats.</p>
+  </section>
+  <section>
+    <h3>Burst</h3>
+    <div class="row"><label for="size">Size</label><output for="size"></output><input id="size" type="range" min="0.08" max="0.7" step="0.01"></div>
+    <div class="row"><label for="steep">Steep</label><output for="steep"></output><input id="steep" type="range" min="1" max="10" step="0.1"></div>
+    <div class="row"><label for="rough">Rough</label><output for="rough"></output><input id="rough" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="fog">Fog</label><output for="fog"></output><input id="fog" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="fogTime">Fog time (s)</label><output for="fogTime"></output><input id="fogTime" type="range" min="0" max="1.5" step="0.05"></div>
+    <p class="hint-text">Each burst first shivers as a disk of fog, then a hill of water is let go. Steep = how sharp its edge is. Rough = lumps on the hill that fold the light into a web of cells. Fog = how strongly it shivers; Fog time = how long before the hill drops (0 = at once). A tap makes a smaller, simpler burst.</p>
+  </section>
+  <section>
+    <h3>Water</h3>
+    <div class="row"><label for="wipe">Clear</label><output for="wipe"></output><input id="wipe" type="range" min="0" max="0.2" step="0.005"></div>
+    <div class="row"><label for="snap">Clear time (s)</label><output for="snap"></output><input id="snap" type="range" min="0.05" max="2" step="0.05"></div>
+    <div class="row"><label for="fade">Fade (s)</label><output for="fade"></output><input id="fade" type="range" min="1" max="20" step="0.5"></div>
+    <div class="row"><label for="speed">Wave speed</label><output for="speed"></output><input id="speed" type="range" min="0.2" max="2.5" step="0.05"></div>
+    <label class="switch" for="walls">Walls <input id="walls" type="checkbox" role="switch"></label>
+    <p class="hint-text">Clear = the water's thickness right after a burst: it wipes out the fog so the web snaps sharp. Fade = how long until the waves die down. Walls bounce waves back from the edges of the tank.</p>
+  </section>
+  <section>
+    <h3>Light</h3>
+    <div class="row"><label for="particles">Particles</label><output for="particles"></output><input id="particles" type="range" min="0" max="5" step="1"></div>
+    <div class="row"><label for="brightness">Brightness</label><output for="brightness"></output><input id="brightness" type="range" min="0.05" max="1.2" step="0.01"></div>
+    <div class="row"><label for="depth">Bend</label><output for="depth"></output><input id="depth" type="range" min="0.05" max="2" step="0.01"></div>
+    <div class="row"><label for="grain">Grain</label><output for="grain"></output><input id="grain" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="afterglow">Afterglow</label><output for="afterglow"></output><input id="afterglow" type="range" min="0" max="0.95" step="0.01"></div>
+    <p class="hint-text">Each particle is a ray of light. Bend = how far it travels after the water bends it; more makes thinner, tangled threads. Grain 0 lines the rays up in rows; 1 scatters them like film grain.</p>
+  </section>
+  <section class="actions">
+    <button type="button" id="burstNow">Burst</button>
+    <button type="button" id="still">Still water</button>
+    <button type="button" id="pause">Pause score</button>
+    <button type="button" id="reset">Reset</button>
+    <button type="button" id="copy" class="primary">Copy settings</button>
+    <div class="copied" id="copied" aria-live="polite"></div>
+    <textarea class="settings" id="settings" rows="6" hidden aria-label="Settings to copy" readonly></textarea>
+  </section>
+</aside>
+
+<script>
+(() => {
+  'use strict';
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const COUNTS = [125000, 250000, 500000, 1000000, 1500000, 2000000];
+  const DEFAULTS = {
+    bpm: reduceMotion ? 45 : 75, random: false,
+    size: 0.36, steep: 4, rough: 0.32, fog: 0.5, fogTime: 0.25,
+    wipe: 0.07, snap: 0.3, fade: 6, speed: 1.4, walls: true,
+    mode: 'floor', focus: 1, dots: touch ? 1 : 2, tint: 1, auto: true,
+    particles: touch ? 1 : 3, brightness: 0.45, depth: 0.8, grain: touch ? 1 : 0.85, afterglow: 0.55,
+  };
+  const S = { ...DEFAULTS };
+
+  const canvas = document.getElementById('stage');
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false, powerPreference: 'high-performance' });
+  const fail = (msg) => { canvas.remove(); document.body.insertAdjacentHTML('afterbegin', `<div class="fallback">${msg}</div>`); };
+  if (!gl) return fail('This experiment needs WebGL2.');
+  if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) return fail('This browser can’t render float textures, which this experiment needs.');
+
+  // =====================================================================
+  // WATER — a height field (r = height, g = velocity) on a grid.
+  // =====================================================================
+  const QUAD_VS = `#version 300 es
+  out vec2 vUv;
+  void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+  const NOISE = `
+  float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+  vec2 g21(vec2 p) { float a = h21(p) * 6.2831853; return vec2(cos(a), sin(a)); }
+  float gnoise(vec2 p) {                       // smooth gradient noise, about -0.7..0.7
+    vec2 i = floor(p), f = fract(p), u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float a = dot(g21(i), f), b = dot(g21(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+    float c = dot(g21(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)), d = dot(g21(i + 1.0), f - 1.0);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+  }`;
+
+  // one wave step + (optionally) a burst landing this step
+  const STEP_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D uState; uniform vec2 uTexel; uniform float uDamp; uniform float uWalls; uniform float uAspect;
+  uniform float uBurstOn; uniform vec4 uBurst; uniform vec4 uShape; uniform vec2 uSeed;
+  // uBurst: x, y (uv), radius (screen heights), height     uShape: lump size, rough, fog, steep
+  ${NOISE}
+  void main() {
+    vec4 s = texture(uState, vUv);
+    float avg = (texture(uState, vUv - vec2(uTexel.x, 0.0)).r + texture(uState, vUv + vec2(uTexel.x, 0.0)).r +
+                 texture(uState, vUv - vec2(0.0, uTexel.y)).r + texture(uState, vUv + vec2(0.0, uTexel.y)).r) * 0.25;
+    s.g += (avg - s.r) * 1.8;
+    float edge = min(min(vUv.x, 1.0 - vUv.x) * uAspect, min(vUv.y, 1.0 - vUv.y));
+    float sponge = mix(0.9, 1.0, smoothstep(0.0, 0.06, edge));
+    s.g *= uDamp * mix(sponge, 1.0, uWalls);
+    s.r += s.g;
+    s.r *= mix(sponge, 1.0, uWalls);
+    if (uBurstOn > 0.5) {
+      vec2 q = (vUv - uBurst.xy) * vec2(uAspect, 1.0);
+      float t = length(q) / uBurst.z;
+      // a disk of steep lumps: each lump's flank folds the light into a thread, so the disk becomes a web of cells
+      float rim = 1.0 + 0.08 * gnoise(vec2(atan(q.y, q.x) * 3.0, 0.0) + uSeed);
+      float disk = 1.0 - smoothstep(0.75, 1.0, t / rim);
+      float lumps = gnoise(q / uShape.x + uSeed) + 0.15 * gnoise(q / uShape.x * 2.03 - uSeed.yx);
+      lumps = tanh(lumps * uShape.w) / tanh(0.6 * uShape.w);   // steep: flat-ish tops, sharp flanks
+      s.r += uBurst.w * disk * (0.25 + uShape.y * 1.6 * lumps);
+    }
+    o = s;
+  }`;
+
+  // viscosity: blur height and velocity together (always stable), strongest just after a burst
+  const VISC_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D uState; uniform vec2 uTexel; uniform float uVisc;
+  void main() {
+    vec4 s = texture(uState, vUv);
+    vec4 avg = (texture(uState, vUv - vec2(uTexel.x, 0.0)) + texture(uState, vUv + vec2(uTexel.x, 0.0)) +
+                texture(uState, vUv - vec2(0.0, uTexel.y)) + texture(uState, vUv + vec2(0.0, uTexel.y))) * 0.25;
+    o = mix(s, avg, uVisc);
+  }`;
+
+  // =====================================================================
+  // LIGHT — one vertex per ray: refracted by the surface slope, lands as a 1px dot.
+  // =====================================================================
+  const PHOTON_VS = `#version 300 es
+  precision highp float;
+  uniform sampler2D uState; uniform vec2 uTexel; uniform vec2 uGrid; uniform float uJitter; uniform float uAspect;
+  uniform float uDepth; uniform float uHeight; uniform float uSeed;
+  uniform int uFogCount; uniform vec4 uFog[4]; // disks in their fog phase: x, y (screen-height units), radius, scatter
+  uint hash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+  void main() {
+    uint id = uint(gl_VertexID);
+    uint cols = uint(uGrid.x);
+    vec2 cell = vec2(float(id % cols), float(id / cols));
+    uint sd = hash(uint(uSeed) + 1u); uint h1 = hash(id ^ sd), h2 = hash(h1 + 0x9e3779b9u);
+    vec2 jit = (vec2(float(h1 & 0xffffu), float(h2 & 0xffffu)) / 65535.0 - 0.5) * uJitter;
+    vec2 uv = mix(vec2(-0.03), vec2(1.03), (cell + 0.5 + jit) / uGrid);
+    float hx = texture(uState, uv + vec2(uTexel.x, 0.0)).r - texture(uState, uv - vec2(uTexel.x, 0.0)).r;
+    float hy = texture(uState, uv + vec2(0.0, uTexel.y)).r - texture(uState, uv - vec2(0.0, uTexel.y)).r;
+    vec2 grad = vec2(hx / (2.0 * uTexel.x * uAspect), hy / (2.0 * uTexel.y)) * uHeight;
+    vec3 n = normalize(vec3(-grad, 1.0));
+    vec3 r = refract(vec3(0.0, 0.0, -1.0), n, 1.0 / 1.333);
+    vec2 p = uv * vec2(uAspect, 1.0);
+    vec2 hit = p + r.xy / -r.z * uDepth;
+    // fog: rays inside a fresh burst are scattered at random, so the disk reads as a dim, grainy blur
+    for (int i = 0; i < 4; i++) {
+      if (i >= uFogCount) break;
+      vec4 f = uFog[i];
+      float m = 1.0 - smoothstep(0.9, 1.0, length(p - f.xy) / f.z);
+      uint h3 = hash(h2 ^ uint(i * 7919 + 1)), h4 = hash(h3);
+      vec2 rnd = vec2(float(h3 & 0xffffu), float(h4 & 0xffffu)) / 65535.0 - 0.5;
+      hit += rnd * f.w * m;
+    }
+    gl_Position = vec4(hit / vec2(uAspect, 1.0) * 2.0 - 1.0, 0.0, 1.0);
+    gl_PointSize = 1.0;
+  }`;
+  // the painting as particles: each dot starts at its home in the painting and is bent by the water like a ray
+  const DOT_VS = `#version 300 es
+  precision highp float;
+  layout(location = 0) in vec2 aHomeA; layout(location = 1) in vec3 aColA; layout(location = 2) in vec2 aHomeB; layout(location = 3) in vec3 aColB;
+  uniform float uMix; uniform vec2 uCoverA;
+  uniform sampler2D uState; uniform vec2 uTexel; uniform float uAspect; uniform float uDepth; uniform float uHeight;
+  uniform vec2 uCover; uniform float uFocus; uniform float uSeed; uniform float uSize; uniform float uFrame; uniform vec2 uPx;
+  out vec3 vCol;
+  uint hash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+  void main() {
+    // between scenes: leave home A, scatter into chaos halfway, gather at home B
+    vec2 ua = (aHomeA - 0.5) * uCoverA + 0.5, ub = (aHomeB - 0.5) * uCover + 0.5;
+    float e = uMix * uMix * (3.0 - 2.0 * uMix);
+    vec2 uv = mix(ua, ub, e);
+    float hx = texture(uState, uv + vec2(uTexel.x, 0.0)).r - texture(uState, uv - vec2(uTexel.x, 0.0)).r;
+    float hy = texture(uState, uv + vec2(0.0, uTexel.y)).r - texture(uState, uv - vec2(0.0, uTexel.y)).r;
+    vec2 grad = vec2(hx / (2.0 * uTexel.x * uAspect), hy / (2.0 * uTexel.y)) * uHeight;
+    vec3 n = normalize(vec3(-grad, 1.0));
+    vec3 r = refract(vec3(0.0, 0.0, -1.0), n, 1.0 / 1.333);
+    vec2 p = uv * vec2(uAspect, 1.0) + r.xy / -r.z * uDepth;
+    // out of focus: each dot drifts on its own slow wander, far away when focus is 0
+    uint id = uint(gl_VertexID);
+    uint h1 = hash(id), h2 = hash(h1 ^ 0x9e3779b9u), h3 = hash(h2);
+    vec2 dir = vec2(float(h1 & 0xffffu), float(h2 & 0xffffu)) / 65535.0 - 0.5;
+    float ph = float(h3 & 0xffffu) / 65535.0 * 6.2831853;
+    float blur = (1.0 - uFocus); blur *= blur;
+    blur = max(blur, 0.35 * sin(3.14159265 * uMix));
+    p += (dir * 1.6 + 0.04 * vec2(sin(uSeed * 0.013 + ph), cos(uSeed * 0.011 + ph * 1.3))) * blur;
+    // a new sub-pixel nudge every frame: with afterglow, the grain melts into smooth paint
+    uint h4 = hash(id ^ hash(uint(uFrame) + 7u)), h5 = hash(h4);
+    p += (vec2(float(h4 & 0xffffu), float(h5 & 0xffffu)) / 65535.0 - 0.5) * uPx * vec2(uAspect, 1.0) * 2.5;
+    gl_Position = vec4(p / vec2(uAspect, 1.0) * 2.0 - 1.0, 0.0, 1.0);
+    gl_PointSize = uSize;
+    vCol = mix(aColA, aColB, e);
+  }`;
+  const DOT_FS = `#version 300 es
+  precision highp float; in vec3 vCol; uniform float uWeight; out vec4 o; void main() { o = vec4(vCol * uWeight, 1.0); }`;
+  const PHOTON_FS = `#version 300 es
+  precision highp float; uniform float uWeight; out vec4 o; void main() { o = vec4(uWeight); }`;
+  const FADE_FS = `#version 300 es
+  precision mediump float; out vec4 o; void main() { o = vec4(0.0); }`;
+  const SHOW_FS = `#version 300 es
+  precision highp float;
+  in vec2 vUv; out vec4 o;
+  uniform sampler2D uLight; uniform float uBright; uniform sampler2D uImage; uniform sampler2D uImageA; uniform int uMode; uniform vec2 uCover; uniform vec2 uCoverA; uniform float uMix; uniform float uTint;
+  void main() {
+    vec4 L = texture(uLight, vUv);
+    if (uMode == 0) {
+      // the painting lies on the pool floor; the light that lands there lights it
+      vec3 img = mix(texture(uImageA, (vUv - 0.5) / uCoverA + 0.5).rgb, texture(uImage, (vUv - 0.5) / uCover + 0.5).rgb, smoothstep(0.0, 1.0, uMix));
+      img = mix(vec3(dot(img, vec3(0.2126, 0.7152, 0.0722))), img, uTint);
+      vec3 c = 1.0 - exp(-img * L.r * uBright * 2.4);
+      o = vec4(pow(c, vec3(1.2)), 1.0);
+    } else {
+      // the painting's own dots, already coloured
+      vec3 rgb = mix(vec3(dot(L.rgb, vec3(0.2126, 0.7152, 0.0722))), L.rgb, uTint);
+      vec3 c = 1.0 - exp(-rgb * uBright);
+      o = vec4(pow(c, vec3(1.3)), 1.0);
+    }
+  }`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function program(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, ''); u[name] = gl.getUniformLocation(p, name); }
+    return { p, u };
+  }
+  let stepP, viscP, photonP, fadeP, showP, dotP;
+  try {
+    stepP = program(QUAD_VS, STEP_FS); viscP = program(QUAD_VS, VISC_FS);
+    photonP = program(PHOTON_VS, PHOTON_FS); dotP = program(DOT_VS, DOT_FS); fadeP = program(QUAD_VS, FADE_FS); showP = program(QUAD_VS, SHOW_FS);
+  } catch (e) { console.error(e); return fail('Couldn’t start WebGL on this device.'); }
+  const emptyVao = gl.createVertexArray(), dotVao = gl.createVertexArray();
+  gl.bindVertexArray(emptyVao);
+
+  function target(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    return { tex, fb, w, h, free() { gl.deleteTexture(tex); gl.deleteFramebuffer(fb); } };
+  }
+
+  let W = 0, H = 0, aspect = 1, sim = null, light = null;
+  function resize() {
+    const w = Math.max(1, Math.round(canvas.clientWidth)), h = Math.max(1, Math.round(canvas.clientHeight)); // 1 ray-dot per CSS pixel
+    if (w === W && h === H) return;
+    W = canvas.width = w; H = canvas.height = h; aspect = w / h;
+    const cells = touch ? 260 : 340; // grid cells along the short side
+    const simW = Math.max(8, Math.round(aspect >= 1 ? cells * aspect : cells)), simH = Math.max(8, Math.round(aspect >= 1 ? cells : cells / aspect));
+    if (sim) { sim.forEach((t) => t.free()); light.free(); }
+    sim = [target(simW, simH), target(simW, simH)];
+    light = target(W, H);
+  }
+  let resizeTimer = 0;
+  new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, sim ? 120 : 0); }).observe(canvas);
+  resize();
+
+  // =====================================================================
+  // PAINTING — the image as a texture (floor mode) and as sampled dots (particle mode)
+  // =====================================================================
+  const DOT_COUNTS = [100000, 200000, 400000, 700000, 1000000];
+  // public-domain paintings; see the notes drawer for credits
+  const SCENES = [{ src: 'whalers-turner.jpg' }, { src: 'whale-storm.jpg' }, { src: 'whale-boats.jpg' }];
+  const grey = new Uint8Array([60, 60, 60, 255]);
+  for (const sc of SCENES) {
+    sc.tex = gl.createTexture(); sc.aspect = 4 / 3; sc.dots = {};
+    gl.bindTexture(gl.TEXTURE_2D, sc.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, grey);
+    const img = new Image();
+    img.onload = () => {
+      sc.aspect = img.naturalWidth / img.naturalHeight;
+      gl.bindTexture(gl.TEXTURE_2D, sc.tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const w = 640, h = Math.round(640 / sc.aspect);           // a small copy to read brightness from
+      const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      sc.px = { w, h, data: ctx.getImageData(0, 0, w, h).data };
+      if (SCENES.indexOf(sc) === sceneB) built = -1;            // rebuild dots once the shown painting arrives
+    };
+    img.src = sc.src;
+  }
+  // Scatter dots where the painting is bright: each pixel's chance = its brightness.
+  // Brightness lives in how many dots land there; each dot keeps only the pixel's hue.
+  function dotsOf(sc, n) {
+    if (sc.dots[n]) return sc.dots[n];
+    const out = new Float32Array(n * 5);
+    if (!sc.px) return out;
+    const { w, h, data: px } = sc.px, N = w * h;
+    const cdf = new Float32Array(N); let sum = 0;
+    for (let i = 0; i < N; i++) {
+      const l = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255;
+      sum += Math.pow(l, 1.4) + 0.004; cdf[i] = sum;
+    }
+    for (let k = 0; k < n; k++) {
+      const u = Math.random() * sum;
+      let lo = 0, hi = N - 1;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (cdf[m] < u) lo = m + 1; else hi = m; }
+      const x = lo % w, y = (lo / w) | 0, r = px[lo * 4] / 255, g = px[lo * 4 + 1] / 255, b = px[lo * 4 + 2] / 255;
+      const l = Math.max(0.06, 0.2126 * r + 0.7152 * g + 0.0722 * b);
+      out.set([(x + Math.random()) / w, 1 - (y + Math.random()) / h, Math.min(3, r / l), Math.min(3, g / l), Math.min(3, b / l)], k * 5);
+    }
+    return (sc.dots[n] = out);
+  }
+  // one buffer holds both homes: where each dot is coming from (A) and going to (B)
+  const dotBuf = gl.createBuffer();
+  gl.bindVertexArray(dotVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
+  [[0, 2, 0], [1, 3, 8], [2, 2, 20], [3, 3, 28]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 40, off); });
+  gl.bindVertexArray(emptyVao);
+  let sceneA = 0, sceneB = 0, mixStart = -99, built = -1, dotCount = 0;
+  const MORPH = 3.2; // seconds from one painting to the next
+  function buildDots(n) {
+    const a = dotsOf(SCENES[sceneA], n), b = dotsOf(SCENES[sceneB], n), buf = new Float32Array(n * 10);
+    for (let k = 0; k < n; k++) { buf.set(a.subarray(k * 5, k * 5 + 5), k * 10); buf.set(b.subarray(k * 5, k * 5 + 5), k * 10 + 5); }
+    gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
+    dotCount = n; built = n;
+  }
+  const sceneMix = () => Math.min(1, Math.max(0, (clock - mixStart) / MORPH));
+  const shownScene = () => (sceneMix() > 0.5 ? sceneB : sceneA);
+  function goTo(i) {
+    if (i === sceneB && sceneMix() >= 1) return;
+    sceneA = sceneMix() > 0.5 ? sceneB : sceneA; sceneB = i; mixStart = clock; built = -1;
+    // a big burst lands as the scene changes
+    burstAtPlace(5, 0);
+    sync();
+  }
+  const coverOf = (sc) => (aspect > sc.aspect ? [1, aspect / sc.aspect] : [sc.aspect / aspect, 1]); // screen uv per image uv
+
+  // =====================================================================
+  // SCORE — where and when bursts land. Places: 1–4 corners, 5 middle, 6–9 walls.
+  // =====================================================================
+  const PLACES = { 1: [0, 1], 2: [1, 1], 3: [0, 0], 4: [1, 0], 5: [0.5, 0.5], 6: [0.5, 1], 7: [1, 0.5], 8: [0.5, 0], 9: [0, 0.5] };
+  // 12 bars x 4 beats; 0 = rest
+  const SCORE = [
+    [1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 7, 0], [0, 0, 0, 0],
+    [3, 0, 0, 0], [0, 0, 6, 0], [0, 0, 0, 0], [5, 0, 0, 0],
+    [0, 0, 0, 0], [2, 0, 9, 0], [0, 0, 0, 0], [4, 0, 8, 0],
+  ];
+  // a slow progression; each burst takes one note of its bar's chord. Low notes make big lumps (long waves), high notes small ones.
+  const CHORDS = [[45, 52, 57, 60, 64], [41, 48, 53, 57, 60], [43, 50, 55, 59, 62], [40, 47, 52, 55, 59]];
+  const listeners = [];
+  const onBurst = (fn) => listeners.push(fn); // hook for sound later: fn({ x, y, note, place })
+
+  // A burst first shivers as a disk of fog for one beat, then the hill is let go and the web snaps sharp.
+  let pendingBurst = null;
+  const fogging = [];
+  function burst(x, y, note = 52, place = 0, small = false) {
+    const scale = Math.pow(2, (52 - note) / 18) * (small ? 1.3 : 1); // one octave ≈ 1.6x lump size; taps get bigger, calmer lumps
+    const diag = Math.hypot(aspect, 1);
+    const fogTime = S.fog > 0 ? S.fogTime * (small ? 0.5 : 1) : 0;
+    const b = { x, y, r: S.size * diag * 0.5 * (small ? 0.55 : 1), rough: S.rough * (small ? 0.6 : 1), note, scale, start: clock, release: clock + fogTime };
+    fogging.push(b); if (fogging.length > 4) fogging.shift();
+    listeners.forEach((fn) => fn({ x, y, note, place }));
+  }
+  function burstAtPlace(place, bar) {
+    const [px, py] = PLACES[place];
+    const j = () => (Math.random() - 0.5) * 0.08;
+    const chord = CHORDS[Math.floor(bar / 3) % CHORDS.length];
+    burst(px + j(), py + j(), chord[Math.floor(Math.random() * chord.length)], place);
+  }
+  function stillWater() { for (const t of sim) { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); } }
+
+  // =====================================================================
+  // LOOP
+  // =====================================================================
+  const now = () => performance.now() / 1000;
+  const fogBuf = new Float32Array(16);
+  let last = now(), clock = 0, lastBurst = -99, beat = -0.85, stepDebt = 0, seed = 0, playing = true;
+  function frame() {
+    const t = now(), dt = Math.min(0.05, t - last); last = t;
+    const motion = reduceMotion ? 0.5 : 1;
+    clock += dt * motion;
+
+    // score
+    if (playing) {
+      const prev = Math.floor(beat);
+      beat += dt * motion * S.bpm / 60;
+      const cur = Math.floor(beat);
+      if (cur > prev && cur >= 0) {
+        const bar = Math.floor(cur / 4) % SCORE.length, slot = cur % 4;
+        if (S.auto && bar === 0 && slot === 0 && cur > 0) goTo((shownScene() + 1) % SCENES.length);
+        if (S.random) { if (slot % 2 === 0 && Math.random() < 0.3) burstAtPlace(1 + Math.floor(Math.random() * 9), bar); }
+        else if (SCORE[bar][slot]) burstAtPlace(SCORE[bar][slot], bar);
+      }
+    }
+
+    // bursts whose fog time is over are let go
+    for (let i = fogging.length - 1; i >= 0; i--) {
+      if (clock >= fogging[i].release && !pendingBurst) { pendingBurst = fogging[i]; fogging.splice(i, 1); lastBurst = clock; }
+    }
+    // water: ~160 steps a second at speed 1, whatever the frame rate
+    const perSec = 160 * S.speed;
+    stepDebt += dt * perSec * motion;
+    const steps = Math.min(10, Math.floor(stepDebt)); stepDebt -= steps; if (steps === 10) stepDebt = 0;
+    const damp = Math.exp(Math.log(0.1) / (S.fade * 160));       // waves fall to 10% after "fade" seconds
+    const since = clock - lastBurst;
+    const visc = (fogging.length ? 0.002 : 0.004) + S.wipe * (1 - Math.min(1, Math.max(0, (since - S.snap) / 0.12))); // thick right after a burst, then thin
+    gl.disable(gl.BLEND);
+    gl.viewport(0, 0, sim[0].w, sim[0].h);
+    gl.activeTexture(gl.TEXTURE0);
+    for (let i = 0; i < steps; i++) {
+      gl.useProgram(stepP.p);
+      gl.uniform1i(stepP.u.uState, 0);
+      gl.uniform2f(stepP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
+      gl.uniform1f(stepP.u.uDamp, damp);
+      gl.uniform1f(stepP.u.uWalls, S.walls ? 1 : 0);
+      gl.uniform1f(stepP.u.uAspect, aspect);
+      const b = i === 0 ? pendingBurst : null;
+      gl.uniform1f(stepP.u.uBurstOn, b ? 1 : 0);
+      gl.uniform2f(stepP.u.uSeed, Math.random() * 100, Math.random() * 100);
+      if (b) {
+        gl.uniform4f(stepP.u.uBurst, b.x, b.y, b.r, 1.6);
+        gl.uniform4f(stepP.u.uShape, 0.05 * b.scale, b.rough, S.fog, S.steep);
+        pendingBurst = null;
+      }
+      gl.bindTexture(gl.TEXTURE_2D, sim[0].tex);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, sim[1].fb);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      sim.reverse();
+      gl.useProgram(viscP.p);
+      gl.uniform1i(viscP.u.uState, 0);
+      gl.uniform2f(viscP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
+      gl.uniform1f(viscP.u.uVisc, visc);
+      gl.bindTexture(gl.TEXTURE_2D, sim[0].tex);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, sim[1].fb);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      sim.reverse();
+    }
+
+    // light: fade the last frame a little (afterglow), then add this frame's rays
+    const count = COUNTS[S.particles];
+    const cols = Math.ceil(Math.sqrt(count * aspect)), rows = Math.ceil(count / cols);
+    const keep = S.afterglow;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, light.fb);
+    gl.viewport(0, 0, W, H);
+    gl.enable(gl.BLEND);
+    gl.blendColor(keep, keep, keep, keep); gl.blendFunc(gl.ZERO, gl.CONSTANT_COLOR);
+    gl.useProgram(fadeP.p); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    const cover = coverOf(SCENES[sceneB]), coverA = coverOf(SCENES[sceneA]), mixNow = sceneMix();
+    if (S.mode === 'dots' && SCENES[sceneB].px) {
+      const want = DOT_COUNTS[S.dots];
+      if (built !== want) buildDots(want);
+      gl.useProgram(dotP.p);
+      gl.bindVertexArray(dotVao);
+      gl.bindTexture(gl.TEXTURE_2D, sim[0].tex); gl.uniform1i(dotP.u.uState, 0);
+      gl.uniform2f(dotP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
+      gl.uniform1f(dotP.u.uAspect, aspect);
+      gl.uniform1f(dotP.u.uDepth, S.depth);
+      gl.uniform1f(dotP.u.uHeight, 0.012);
+      gl.uniform2f(dotP.u.uCover, cover[0], cover[1]);
+      gl.uniform2f(dotP.u.uCoverA, coverA[0], coverA[1]);
+      gl.uniform1f(dotP.u.uMix, mixNow);
+      gl.uniform1f(dotP.u.uFrame, seed);
+      gl.uniform2f(dotP.u.uPx, 1 / W, 1 / H);
+      gl.uniform1f(dotP.u.uFocus, S.focus);
+      gl.uniform1f(dotP.u.uSeed, clock * 60);
+      gl.uniform1f(dotP.u.uSize, 2);
+      gl.uniform1f(dotP.u.uWeight, (W * H) / dotCount * 0.45 * (1 - keep));
+      gl.drawArrays(gl.POINTS, 0, dotCount);
+      gl.bindVertexArray(emptyVao);
+    } else {
+    gl.useProgram(photonP.p);
+    seed = (seed + 1) % 4096;
+    gl.bindTexture(gl.TEXTURE_2D, sim[0].tex); gl.uniform1i(photonP.u.uState, 0);
+    gl.uniform2f(photonP.u.uTexel, 1 / sim[0].w, 1 / sim[0].h);
+    gl.uniform2f(photonP.u.uGrid, cols, rows);
+    gl.uniform1f(photonP.u.uJitter, S.grain);
+    gl.uniform1f(photonP.u.uAspect, aspect);
+    gl.uniform1f(photonP.u.uDepth, S.depth);
+    gl.uniform1f(photonP.u.uHeight, 0.012);
+    gl.uniform1f(photonP.u.uSeed, seed);
+    gl.uniform1i(photonP.u.uFogCount, fogging.length);
+    if (fogging.length) {
+      fogBuf.fill(0);
+      fogging.forEach((f, k) => {
+        const age = Math.min(1, (clock - f.start) / Math.max(0.01, f.release - f.start));
+        fogBuf.set([f.x * aspect, f.y, f.r, S.fog * 0.09 * Math.min(1, age * 4)], k * 4);
+      });
+      gl.uniform4fv(photonP.u.uFog, fogBuf);
+    }
+    gl.uniform1f(photonP.u.uWeight, (W * H * 1.06 * 1.06) / (cols * rows) * (1 - keep));
+    gl.drawArrays(gl.POINTS, 0, cols * rows);
+    }
+    gl.disable(gl.BLEND);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(showP.p);
+    gl.bindTexture(gl.TEXTURE_2D, light.tex); gl.uniform1i(showP.u.uLight, 0);
+    gl.uniform1f(showP.u.uBright, S.brightness);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, SCENES[sceneB].tex); gl.uniform1i(showP.u.uImage, 1);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, SCENES[sceneA].tex); gl.uniform1i(showP.u.uImageA, 2); gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(showP.u.uMode, S.mode === 'dots' ? 1 : 0);
+    gl.uniform2f(showP.u.uCover, cover[0], cover[1]);
+    gl.uniform2f(showP.u.uCoverA, coverA[0], coverA[1]);
+    gl.uniform1f(showP.u.uMix, mixNow);
+    gl.uniform1f(showP.u.uTint, S.tint);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // =====================================================================
+  // INPUT + PANEL
+  // =====================================================================
+  canvas.addEventListener('pointerdown', (e) => {
+    const r = canvas.getBoundingClientRect();
+    const chord = CHORDS[Math.floor(Math.max(0, beat) / 12) % CHORDS.length];
+    burst((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height, chord[Math.floor(Math.random() * chord.length)], 0, true);
+  });
+  const fmt = {
+    particles: (v) => (COUNTS[v] >= 1e6 ? COUNTS[v] / 1e6 + 'M' : COUNTS[v] / 1e3 + 'K'),
+    dots: (v) => (DOT_COUNTS[v] >= 1e6 ? DOT_COUNTS[v] / 1e6 + 'M' : DOT_COUNTS[v] / 1e3 + 'K'),
+    bpm: (v) => String(Math.round(v)), wipe: (v) => (+v).toFixed(3), fade: (v) => (+v).toFixed(1),
+  };
+  const sliders = ['focus', 'dots', 'tint', 'bpm', 'size', 'steep', 'rough', 'fog', 'fogTime', 'wipe', 'snap', 'fade', 'speed', 'particles', 'brightness', 'depth', 'grain', 'afterglow'];
+  const switches = ['random', 'walls', 'auto'];
+  const sync = () => {
+    for (const id of sliders) {
+      document.getElementById(id).value = S[id];
+      document.querySelector(`output[for="${id}"]`).textContent = (fmt[id] || ((v) => (+v).toFixed(2)))(S[id]);
+    }
+    for (const id of switches) document.getElementById(id).checked = S[id];
+    document.getElementById('modeFloor').setAttribute('aria-pressed', String(S.mode === 'floor'));
+    document.getElementById('modeDots').setAttribute('aria-pressed', String(S.mode === 'dots'));
+    document.querySelectorAll('.scenes button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.scene === shownScene())));
+  };
+  document.getElementById('modeFloor').addEventListener('click', () => { S.mode = 'floor'; sync(); });
+  document.getElementById('modeDots').addEventListener('click', () => { S.mode = 'dots'; sync(); });
+  document.querySelectorAll('.scenes button').forEach((b) => b.addEventListener('click', () => goTo(+b.dataset.scene)));
+  for (const id of sliders) document.getElementById(id).addEventListener('input', (e) => { S[id] = +e.target.value; sync(); });
+  for (const id of switches) document.getElementById(id).addEventListener('change', (e) => { S[id] = e.target.checked; });
+  document.getElementById('burstNow').addEventListener('click', () => burstAtPlace(1 + Math.floor(Math.random() * 9), Math.max(0, Math.floor(beat / 4))));
+  document.getElementById('still').addEventListener('click', stillWater);
+  const pauseBtn = document.getElementById('pause');
+  pauseBtn.addEventListener('click', () => { playing = !playing; pauseBtn.textContent = playing ? 'Pause score' : 'Play score'; });
+  document.getElementById('reset').addEventListener('click', () => { Object.assign(S, DEFAULTS); sync(); });
+  document.getElementById('copy').addEventListener('click', async () => {
+    const line = 'Turner Underwater settings: ' + JSON.stringify(S);
+    const out = document.getElementById('copied'), ta = document.getElementById('settings');
+    try { await navigator.clipboard.writeText(line); out.textContent = 'Copied — paste it to the secretary'; ta.hidden = true; }
+    catch { ta.value = line; ta.hidden = false; ta.select(); out.textContent = 'Copy this line:'; }
+  });
+  const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
+  tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
+  sync();
+  window.caustics = { S, burst, burstAtPlace, onBurst, goTo, get beat() { return beat; } };
+})();
+</script>
+<script type="module" src="/assets/js/exp-notes.js"></script>
+</body>
+</html>

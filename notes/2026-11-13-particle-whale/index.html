@@ -61,10 +61,10 @@
   <div class="meta">
     <span class="mono">2026-11-13</span>
     <span class="mono" style="color:var(--accent)">Note · Tutorial</span>
-    <a class="mono" href="/playground/particles/whale/" style="color:var(--ink)">看完整的鯨魚 ↗</a>
+    <a class="mono" href="/playground/particle-whale/" style="color:var(--ink)">看完整的鯨魚 ↗</a>
   </div>
 
-  <p><a href="/playground/particles/whale/">Particle Whale</a> 是一隻用二十萬顆點組成的 3D 藍鯨，會游泳、會張嘴，還可以照 X 光看骨頭。它看起來很難，但其實是幾個很簡單的想法疊在一起。這篇寫給完全沒寫過程式的人：七個步驟，每一步都有一個可以直接玩的小範例。拖拖看裡面的滑桿，或用滑鼠拖著鯨魚轉。</p>
+  <p><a href="/playground/particle-whale/">Particle Whale</a> 是一隻用二十萬顆點組成的 3D 藍鯨，會游泳、會張嘴，還可以照 X 光看骨頭。它看起來很難，但其實是幾個很簡單的想法疊在一起。這篇寫給完全沒寫過程式的人：七個步驟，每一步都有一個可以直接玩的小範例。拖拖看裡面的滑桿，或用滑鼠拖著鯨魚轉。</p>
 
   <p>整隻鯨魚分四層，由下往上疊：</p>
   <div class="map">④ 動起來    游泳的波浪、會開合的嘴巴
@@ -121,7 +121,7 @@ for (const t of triangles) { total += t.area; t.end = total; }
 // 抽籤：丟一個 0 ~ total 的數字，找出它落在哪個三角形
 const u = Math.random() * total;
 const t = triangles.find((t) =&gt; t.end &gt;= u);   // 真正的程式用「二分搜尋」，快很多</code></pre>
-  <p class="lesson">這招跟 <a href="/playground/particles/">Particle Painting</a> 一模一樣。那邊是「越亮的像素越容易分到點」，這邊是「越大的三角形越容易分到點」。同一個小技巧，換個地方用就變成新作品。</p>
+  <p class="lesson">這招跟我另一個還在做的粒子實驗 Particle Painting 一模一樣。那邊是「越亮的像素越容易分到點」，這邊是「越大的三角形越容易分到點」。同一個小技巧，換個地方用就變成新作品。</p>
 
   <h2><span class="mono">04</span>轉成畫面：近大遠小</h2>
   <p>點都有 3D 的座標了，但螢幕是平的。要把 3D 變成 2D，只要記住一件事：<b>離你越遠的東西看起來越小</b>。程式裡就是把位置除以距離：遠的點除以大的數字，就往畫面中間縮。</p>
@@ -201,7 +201,7 @@ if (在嘴巴線以下) 把點繞著嘴角轉 (張嘴角度 × 離嘴角多遠);
     <li><b>我搞錯鯨魚種類</b>：一開始做的是白鯨記裡的抹香鯨，嘴巴是一根細細的下顎，我一直覺得怪。後來拿藍鯨的海報來比，才發現我想要的是藍鯨的嘴。最後兩隻都留下來，可以切換。</li>
   </ol>
   <p class="lesson">一個除錯小習慣：<b>用數字確認，不要只靠眼睛。</b>有一次我以為「藏起背面」壞了，把正面的點也藏掉了。把距離圖上的數字印出來看，才發現它是對的，只是正面剛好背光、太暗而已。</p>
-  <p>完整的程式碼在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/playground/particles/whale/index.html" target="_blank" rel="noopener" style="text-decoration:underline">GitHub ↗</a>，這篇的範例在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/notes/2026-11-13-particle-whale/demos.js" target="_blank" rel="noopener" style="text-decoration:underline">demos.js ↗</a>。</p>
+  <p>完整的程式碼在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/playground/particle-whale/index.html" target="_blank" rel="noopener" style="text-decoration:underline">GitHub ↗</a>，這篇的範例在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/notes/2026-11-13-particle-whale/demos.js" target="_blank" rel="noopener" style="text-decoration:underline">demos.js ↗</a>。</p>
 </article>
 </main>
 <!-- FOOTER: keep identical on every page -->

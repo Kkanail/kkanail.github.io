@@ -66,7 +66,7 @@
 </style>
 </head>
 <body>
-<canvas id="stage" aria-label="A 3D white whale drawn with glowing dots. Drag to turn it, tap to scatter the dots, scroll or pinch to come closer."></canvas>
+<canvas id="stage" aria-label="A 3D white whale drawn with glowing dots. Drag to turn it, tap it to send a ripple over its skin, tap the water to scatter the dots, scroll or pinch to come closer."></canvas>
 <div class="bar top">
   <nav class="crumbs" aria-label="Breadcrumb">
     <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
@@ -74,7 +74,7 @@
     <h1 class="crumb-here">Particle Whale</h1>
   </nav>
 </div>
-<p class="hint">Drag to turn · tap to scatter · scroll to zoom</p>
+<p class="hint">Drag to turn · tap the whale to ripple · tap the water to scatter</p>
 
 <aside class="panel" id="panel" aria-label="Whale settings">
   <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
@@ -92,7 +92,7 @@
   </section>
   <section>
     <h3>How it’s built</h3>
-    <p class="hint-text">1 · <em>Shape:</em> the body is a row of rounded cross-sections from snout to tail (boxy at the head, round in the middle, flat-sided at the tail), joined into a skin of triangles. Jaw, flippers and flukes are made the same way. 2 · <em>Skin:</em> each triangle gets a tone: wrinkles on the forehead and flanks, a few old scars, the eye. 3 · <em>Dots:</em> a triangle’s chance of getting a dot is its area × its tone — the same running-total trick as the painting, on a surface instead of a picture. 4 · <em>Light:</em> every frame, each dot asks how much it faces the light and the camera.</p>
+    <p class="hint-text">1 · <em>Shape:</em> the body is a row of rounded cross-sections from snout to tail (boxy at the head, round in the middle, flat-sided at the tail), joined into a skin of triangles. Jaw, teeth, flippers and flukes are made the same way. 2 · <em>Skin:</em> each triangle gets a tone: wrinkles on the forehead and flanks, a few old scars, the eye. 3 · <em>Dots:</em> a triangle’s chance of getting a dot is its area × its tone — the same running-total trick as the painting, on a surface instead of a picture. 4 · <em>Light:</em> every frame, each dot asks how much it faces the light and the camera.</p>
     <p class="math" id="math"></p>
   </section>
   <section>
@@ -119,11 +119,17 @@
   </section>
   <section>
     <h3>Motion</h3>
+    <div class="row"><label for="mouth">Mouth</label><output for="mouth"></output><input id="mouth" type="range" min="0" max="1" step="0.01"></div>
+    <div class="modes" role="group" aria-label="Mouth movement" style="margin-top:12px">
+      <button type="button" id="chewOn" aria-pressed="true">Open &amp; shut</button>
+      <button type="button" id="chewOff" aria-pressed="false">Hold open</button>
+    </div>
     <div class="row"><label for="swim">Swim</label><output for="swim"></output><input id="swim" type="range" min="0" max="1.5" step="0.01"></div>
     <div class="row"><label for="sea">Sea</label><output for="sea"></output><input id="sea" type="range" min="0" max="0.3" step="0.005"></div>
+    <div class="row"><label for="ripple">Ripple</label><output for="ripple"></output><input id="ripple" type="range" min="0" max="2" step="0.01"></div>
     <div class="row"><label for="shatter">Scatter</label><output for="shatter"></output><input id="shatter" type="range" min="0" max="2" step="0.01"></div>
     <div class="row"><label for="gather">Gather (s)</label><output for="gather"></output><input id="gather" type="range" min="1" max="10" step="0.1"></div>
-    <p class="hint-text">Whales swim by beating the tail up and down, so the wave runs along the back toward the flukes. Sea = the share of dots left drifting as marine snow.</p>
+    <p class="hint-text">The lower jaw is long and narrow and swings open on a hinge under the eye, showing the only teeth a sperm whale has. Whales swim by beating the tail up and down, so the wave runs along the back toward the flukes. Tap the whale and a ripple runs out over its skin from that spot; tap the water around it and the dots scatter. Sea = the share of dots left drifting as marine snow.</p>
   </section>
   <section class="actions">
     <button type="button" id="regather">Scatter all</button>
@@ -145,7 +151,7 @@
     dots: touch ? 1 : 2, size: 1.8, brightness: 1, tint: 0.7, trail: 0.3,
     rim: 0.8, solid: 1, skin: 0.7,
     blur: 0.35, focus: 0, spin: reduceMotion ? 0 : 0.25,
-    swim: reduceMotion ? 0.3 : 1, sea: 0.06, shatter: reduceMotion ? 0.4 : 1, gather: 4,
+    swim: reduceMotion ? 0.3 : 1, mouth: 0.7, chew: true, ripple: 1, sea: 0.06, shatter: reduceMotion ? 0.4 : 1, gather: 4,
   };
   const S = { ...DEFAULTS };
 
@@ -218,10 +224,20 @@
   const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   // the narrow lower jaw, tucked under the head
-  const jaw = loftPart('jaw', 60, 32, (u) => {
-    const s = 0.065 + u * 0.27, P = profile(s), f = Math.sqrt(Math.sin(Math.PI * Math.min(1, u * 1.6 + 0.0001) / 2)) * (1 - smooth(0.75, 1, u));
-    return { c: [1 - 2 * s, P.yc - P.B * 0.9 - 0.012, 0], a: [0, 0, 1], b: [0, 1, 0], ra: 0.042 * f, rb: 0.03 * f };
-  });
+  const jawAt = (s) => { const P = profile(s), u = (s - 0.065) / 0.27, f = Math.sqrt(Math.sin(Math.PI * Math.min(1, u * 1.6 + 0.0001) / 2)) * (1 - smooth(0.75, 1, u));
+    return { c: [1 - 2 * s, P.yc - P.B * 0.9 - 0.012, 0], ra: 0.042 * f, rb: 0.03 * f }; };
+  const jaw = loftPart('jaw', 60, 32, (u) => ({ ...jawAt(0.065 + u * 0.27), a: [0, 0, 1], b: [0, 1, 0] }));
+  jaw.jaw = 1;
+  // it opens on a hinge at the back of the jaw, under the eye
+  const HINGE = jawAt(0.32).c;
+  // sperm whales only have teeth in the lower jaw: two rows of blunt cones, hidden in sockets of the upper jaw when the mouth is shut
+  const TEETH = [];
+  for (let i = 0; i < 18; i++) for (const side of [1, -1]) {
+    const s = 0.085 + i * 0.0095, J = jawAt(s), base = [J.c[0], J.c[1] + J.rb * 0.8, side * J.ra * 0.55];
+    const h = 0.02 - i * 0.0003, r = 0.0055;
+    const tooth = loftPart('tooth', 4, 8, (u) => ({ c: [base[0], base[1] + h * u, base[2]], a: [1, 0, 0], b: [0, 0, 1], ra: r * Math.sqrt(1 - u) + 0.0004, rb: r * Math.sqrt(1 - u) + 0.0004 }));
+    tooth.jaw = 1; TEETH.push(tooth);
+  }
   // two small paddle flippers, low on the sides behind the eye
   const flipper = (side) => {
     const P = profile(0.31), root = [1 - 2 * 0.31, P.yc - P.B * 0.55, side * P.W * 0.72];
@@ -240,7 +256,7 @@
       return { c: [le - chord / 2, y0 + 0.025 * u * u, side * 0.37 * u], a: [1, 0, 0], b: [0, 1, 0], ra: chord / 2, rb: 0.02 * Math.pow(1 - u, 0.8) + 0.002 };
     });
   };
-  const PARTS = [bodyPart(), jaw, flipper(1), flipper(-1), fluke(1), fluke(-1)];
+  const PARTS = [bodyPart(), jaw, ...TEETH, flipper(1), flipper(-1), fluke(1), fluke(-1)];
 
   // is a point inside the body? (bits of jaw, flipper and fluke hidden inside it get no dots)
   function insideBody(x, y, z) {
@@ -274,7 +290,7 @@
       tone *= 1 - 0.9 * Math.exp(-((de / 0.011) ** 2));
       tone += 0.25 * Math.exp(-(((de - 0.022) / 0.006) ** 2));
     } else if (part === 'jaw') tone = 1.05;
-    else tone = 0.95 - 0.1 * Math.pow(0.5 + 0.5 * Math.sin(s * 60), 8);
+    else tone = part === 'tooth' ? 1.15 : 0.95 - 0.1 * Math.pow(0.5 + 0.5 * Math.sin(s * 60), 8);
     return Math.max(0.05, Math.min(1.3, tone));
   }
 
@@ -301,7 +317,7 @@
         const cc = [(cen[t[0] * 3] + cen[t[1] * 3] + cen[t[2] * 3]) / 3, (cen[t[0] * 3 + 1] + cen[t[1] * 3 + 1] + cen[t[2] * 3 + 1]) / 3, (cen[t[0] * 3 + 2] + cen[t[1] * 3 + 2] + cen[t[2] * 3 + 2]) / 3];
         if ((mid[0] - cc[0]) * nn[0] + (mid[1] - cc[1]) * nn[1] + (mid[2] - cc[2]) * nn[2] < 0) { nn = nn.map((v) => -v); t.reverse(); }
         for (const k of t) { nor[k * 3] += nn[0]; nor[k * 3 + 1] += nn[1]; nor[k * 3 + 2] += nn[2]; }   // area-weighted vertex normals
-        if (part.name !== 'body' && insideBody(...mid)) continue;
+        if (!part.jaw && part.name !== 'body' && insideBody(...mid)) continue;
         keep.push({ t, area: area2 / 2 });
       }
       for (let k = 0; k < n; k++) { const v = norm([nor[k * 3], nor[k * 3 + 1], nor[k * 3 + 2]]); nor.set(v, k * 3); }
@@ -315,10 +331,10 @@
   // the same skin as one invisible mesh: drawn first into a depth picture, so dots behind the body can be hidden
   const MESH = (() => {
     let nv = 0, ni = 0; for (const pt of PARTS) { nv += pt.pos.length / 3; ni += pt.tris.length * 3; }
-    const vtx = new Float32Array(nv * 6), idx = new Uint32Array(ni); let vo = 0, io = 0;
+    const vtx = new Float32Array(nv * 7), idx = new Uint32Array(ni); let vo = 0, io = 0;
     for (const pt of PARTS) {
       const n = pt.pos.length / 3;
-      for (let k = 0; k < n; k++) vtx.set([pt.pos[k * 3], pt.pos[k * 3 + 1], pt.pos[k * 3 + 2], pt.nor[k * 3], pt.nor[k * 3 + 1], pt.nor[k * 3 + 2]], (vo + k) * 6);
+      for (let k = 0; k < n; k++) vtx.set([pt.pos[k * 3], pt.pos[k * 3 + 1], pt.pos[k * 3 + 2], pt.nor[k * 3], pt.nor[k * 3 + 1], pt.nor[k * 3 + 2], pt.jaw ? 1 : 0], (vo + k) * 7);
       for (const t of pt.tris) { idx[io++] = t[0] + vo; idx[io++] = t[1] + vo; idx[io++] = t[2] + vo; }
       vo += n;
     }
@@ -332,19 +348,20 @@
       TRI.list.forEach((tr, i) => { sum += tr.area * (1 - 0.45 * skin * (1 - tr.tn)); TRI.cdf[i] = sum; });
       TRI.sum = sum; TRI.skin = skin;
     }
-    const out = new Float32Array(n * 7), { list, cdf, sum } = TRI;
+    const out = new Float32Array(n * 8), { list, cdf, sum } = TRI;
     for (let k = 0; k < n; k++) {
       const u = Math.random() * sum; let a = 0, b = list.length - 1;
       while (a < b) { const m = (a + b) >> 1; if (cdf[m] < u) a = m + 1; else b = m; }
       const tr = list[a], [i0, i1, i2] = tr.t, P = tr.part.pos;
       let r1 = Math.sqrt(Math.random()), r2 = Math.random();
       const w0 = 1 - r1, w1 = r1 * (1 - r2), w2 = r1 * r2;
-      const o = k * 7;
+      const o = k * 8;
       for (let c = 0; c < 3; c++) {
         out[o + c] = P[i0 * 3 + c] * w0 + P[i1 * 3 + c] * w1 + P[i2 * 3 + c] * w2;
         out[o + 3 + c] = tr.nor[i0 * 3 + c] * w0 + tr.nor[i1 * 3 + c] * w1 + tr.nor[i2 * 3 + c] * w2;
       }
       out[o + 6] = tr.tone[i0] * w0 + tr.tone[i1] * w1 + tr.tone[i2] * w2;
+      out[o + 7] = tr.part.jaw ? 1 : 0;
     }
     return out;
   }
@@ -353,8 +370,34 @@
   // SHADERS
   // =====================================================================
   // swim: a vertical wave runs from mid-body to the flukes, growing toward the tail (shared by the dots and the hidden mesh)
+  const RIP_MAX = 8;
   const SWIM = `
-  uniform float uSwimT; uniform float uSwim;
+  uniform float uSwimT; uniform float uSwim; uniform float uJaw; uniform vec2 uHinge;
+  // the lower jaw (and its teeth) swings down around the hinge
+  void openJaw(inout vec3 p, inout vec3 n, float isJaw) {
+    if (isJaw < 0.5) return;
+    float c = cos(-uJaw), s = sin(-uJaw);
+    vec2 d = p.xy - uHinge;
+    p.xy = uHinge + vec2(d.x * c - d.y * s, d.x * s + d.y * c);
+    n.xy = vec2(n.x * c - n.y * s, n.x * s + n.y * c);
+  }
+  // ripples: rings that spread over the skin from where the whale was tapped
+  uniform vec4 uRip[${RIP_MAX}]; uniform int uRipN; uniform float uRipAmt; uniform float uNow;
+  float ripple(inout vec3 p, vec3 n) {
+    float glow = 0.0, off = 0.0;
+    for (int i = 0; i < ${RIP_MAX}; i++) {
+      if (i >= uRipN) break;
+      float age = uNow - uRip[i].w;
+      float d = distance(p, uRip[i].xyz), r = age * 0.55;
+      float x = d - r;
+      float env = exp(-x * x / 0.012) * exp(-age * 0.55) * exp(-d * 0.6) * smoothstep(0.0, 0.12, age);
+      float wave = cos(x * 48.0);
+      off += wave * env;
+      glow += env * (0.35 + 0.65 * max(wave, 0.0));
+    }
+    p += n * off * 0.03 * uRipAmt;
+    return glow * uRipAmt;
+  }
   void swim(inout vec3 p, inout vec3 n) {
     float q = clamp((0.35 - p.x) / 1.45, 0.0, 1.0);
     float A = uSwim * 0.12 * q * q, dA = uSwim * 0.12 * 2.0 * q * (-1.0 / 1.45) * step(q, 0.999);
@@ -367,15 +410,15 @@
   }`;
   const DEPTH_VS = `#version 300 es
   precision highp float;
-  layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor;
+  layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor; layout(location = 3) in float aJaw;
   uniform mat4 uView; uniform mat4 uProj; out float vD;
   ${SWIM}
-  void main() { vec3 p = aPos, n = aNor; swim(p, n); p -= n * 0.006; vec4 v = uView * vec4(p, 1.0); vD = -v.z; gl_Position = uProj * v; }`;
+  void main() { vec3 p = aPos, n = aNor; openJaw(p, n, aJaw); swim(p, n); ripple(p, n); p -= n * 0.006; vec4 v = uView * vec4(p, 1.0); vD = -v.z; gl_Position = uProj * v; }`;
   const DEPTH_FS = `#version 300 es
   precision highp float; in float vD; out vec4 o; void main() { o = vec4(vD, 0.0, 0.0, 1.0); }`;
   const DOT_VS = `#version 300 es
   precision highp float;
-  layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor; layout(location = 2) in float aTone;
+  layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor; layout(location = 2) in float aTone; layout(location = 3) in float aJaw;
   uniform mat4 uView; uniform mat4 uProj; uniform vec3 uCam; uniform vec3 uLight; uniform float uAspect;
   uniform float uTime; uniform float uGather; uniform float uSea; uniform float uFrame;
   uniform float uSize; uniform float uWeight; uniform float uAperture; uniform float uFocusDist; uniform float uLensPx; uniform float uDist0;
@@ -389,7 +432,9 @@
   void main() {
     uint id = uint(gl_VertexID);
     vec3 p = aPos, n = aNor;
+    openJaw(p, n, aJaw);
     swim(p, n);
+    float glow = ripple(p, n);
     // gather: each dot comes in from the sea with its own delay; sea dots never arrive
     bool sea = rnd(id * 7u + 3u) < uSea;
     vec3 r = rnd3(id * 3u + 1u);
@@ -428,7 +473,7 @@
     vec3 L = normalize(uLight);
     float lam = max(0.0, dot(n, L));
     float rim = pow(1.0 - abs(ndv), 3.0) * g;
-    float tone = mix(1.0, aTone, uSkin);
+    float tone = mix(1.0, aTone, uSkin) * (1.0 + 2.6 * glow * g);
     float fade = exp(-max(0.0, depth - 3.0) * 0.12);
     vec3 col; float k;
     if (uInk == 0) {
@@ -483,16 +528,24 @@
   const dotBuf = gl.createBuffer();
   gl.bindVertexArray(dotVao);
   gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
-  [[0, 3, 0], [1, 3, 12], [2, 1, 24]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 28, off); });
+  [[0, 3, 0], [1, 3, 12], [2, 1, 24], [3, 1, 28]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 32, off); });
   gl.bindVertexArray(emptyVao);
   const meshVao = gl.createVertexArray();
   gl.bindVertexArray(meshVao);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, MESH.vtx, gl.STATIC_DRAW);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, MESH.idx, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
-  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 28, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 28, 12);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 28, 24);
   gl.bindVertexArray(emptyVao);
   let dotCount = 0, built = -1;
+  const ripples = [], ripBuf = new Float32Array(RIP_MAX * 4);
+  function setRipples(u) {
+    while (ripples.length && clock - ripples[0][3] > 5) ripples.shift();
+    ripples.forEach((r, k) => ripBuf.set(r, k * 4));
+    gl.uniform1i(u.uRipN, ripples.length); gl.uniform1f(u.uRipAmt, S.ripple); gl.uniform1f(u.uNow, clock);
+    if (ripples.length) gl.uniform4fv(u.uRip, ripBuf);
+  }
   function buildDots(n) {
     gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
     gl.bufferData(gl.ARRAY_BUFFER, dotsOf(n, S.skin), gl.STATIC_DRAW);
@@ -580,7 +633,10 @@
     pointers.delete(e.pointerId);
     if (down && !down.moved && performance.now() - down.t < 400 && pointers.size === 0) {
       const r = canvas.getBoundingClientRect();
-      scatter([((e.clientX - r.left) / r.width) * 2 - 1, 1 - ((e.clientY - r.top) / r.height) * 2]);
+      const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = 1 - ((e.clientY - r.top) / r.height) * 2;
+      const hit = skinAt(nx, ny);
+      if (hit) { ripples.push([...hit, clock]); if (ripples.length > RIP_MAX) ripples.shift(); }
+      else scatter([nx, ny]);
     }
     if (down && down.moved && performance.now() - down.lt > 80) { cam.vyaw = 0; cam.vpitch = 0; }
     if (pointers.size === 0) down = null;
@@ -589,7 +645,19 @@
   canvas.addEventListener('pointercancel', (e) => { pointers.delete(e.pointerId); down = null; });
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.zoom = Math.min(2.2, Math.max(0.4, cam.zoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
 
-  let clock = 0, swimT = 0, gatherStart = 0, shatterStart = -99, shatterAt = [0, 0];
+  // where on the skin is this screen point? read the hidden mesh's depth there and walk back along the camera ray
+  let camBasis = null;
+  const depthPx = new Float32Array(4);
+  function skinAt(nx, ny) {
+    if (!camBasis || !dep) return null;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dep.fb);
+    gl.readPixels(Math.min(dep.w - 1, Math.max(0, ((nx + 1) / 2 * dep.w) | 0)), Math.min(dep.h - 1, Math.max(0, ((ny + 1) / 2 * dep.h) | 0)), 1, 1, gl.RGBA, gl.FLOAT, depthPx);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const d = depthPx[0]; if (!(d > 0 && d < 100)) return null;
+    const { x, y, z, e, f, a, p8 } = camBasis, vx = (nx + p8) * a / f * d, vy = ny / f * d;
+    return [0, 1, 2].map((k) => e[k] + x[k] * vx + y[k] * vy - z[k] * d);
+  }
+  let clock = 0, swimT = 0, mouthT = 0, jawAngle = 0, gatherStart = 0, shatterStart = -99, shatterAt = [0, 0];
   function scatter(at) { if (clock - shatterStart < S.gather * 0.6) return; shatterAt = at || [0, 0]; shatterStart = clock; }
   function regather() { gatherStart = clock; }
 
@@ -602,6 +670,12 @@
     clock += dt; frameNo = (frameNo + 1) % 4096;
     fps = fps * 0.9 + 0.1 / Math.max(1e-3, t - prevT); prevT = t;
     swimT += dt * (reduceMotion ? 0.5 : 1) * Math.min(1, 0.4 + S.swim);
+    // the mouth: a slow cycle (open, hold, shut, rest), or held still at the slider's angle when Mouth cycle is off
+    mouthT += dt * (reduceMotion ? 0.5 : 1);
+    const ph = (mouthT % 9) / 9;
+    const cyc = S.chew ? smooth(0.05, 0.3, ph) * (1 - smooth(0.5, 0.68, ph)) : 1;
+    const jawWant = S.mouth * 1.05 * cyc;                   // up to ~60°
+    jawAngle += (jawWant - jawAngle) * Math.min(1, dt * 6);
     const want = DOT_COUNTS[S.dots];
     if (built !== want) buildDots(want);
 
@@ -622,9 +696,11 @@
     cam.dist = fitDist * cam.zoom;
     const eye = camPos(), target = [0, 0, 0];
     const view = lookAt(eye, target);
+    const zAxis = norm(eye.map((v, k) => v - target[k])), xAxis = norm(cross([0, 1, 0], zAxis));
     const proj = perspective(aspect);
     // on wide screens, slide the picture left so the whale sits in the space beside the panel
     proj[8] = wide ? 300 / (W / dpr) : 0;
+    camBasis = { x: xAxis, y: cross(zAxis, xAxis), z: zAxis, e: eye, f: 1 / Math.tan(fov / 2), a: aspect, p8: proj[8] };
 
     // 1 · the hidden mesh → depth picture
     gl.bindFramebuffer(gl.FRAMEBUFFER, dep.fb);
@@ -635,6 +711,8 @@
     gl.uniformMatrix4fv(depthP.u.uView, false, view);
     gl.uniformMatrix4fv(depthP.u.uProj, false, proj);
     gl.uniform1f(depthP.u.uSwimT, swimT); gl.uniform1f(depthP.u.uSwim, S.swim);
+    setRipples(depthP.u);
+    gl.uniform1f(depthP.u.uJaw, jawAngle); gl.uniform2f(depthP.u.uHinge, HINGE[0], HINGE[1]);
     gl.bindVertexArray(meshVao);
     gl.drawElements(gl.TRIANGLES, MESH.idx.length, gl.UNSIGNED_INT, 0);
     gl.disable(gl.DEPTH_TEST);
@@ -660,6 +738,8 @@
       gl.uniform1f(u.uTime, clock);
       gl.uniform1f(u.uSwimT, swimT);
       gl.uniform1f(u.uSwim, S.swim);
+      setRipples(u);
+      gl.uniform1f(u.uJaw, jawAngle); gl.uniform2f(u.uHinge, HINGE[0], HINGE[1]);
       gl.uniform1f(u.uGather, Math.min(1.0001, (clock - gatherStart) / S.gather));
       gl.uniform1f(u.uSea, S.sea);
       gl.uniform1f(u.uFrame, frameNo);
@@ -704,22 +784,22 @@
     const parts = {}; for (const tr of TRI.list) parts[tr.part.name] = (parts[tr.part.name] || 0) + 1;
     mathEl.innerHTML =
       `section: |z/W|<sup>n</sup> + |y/H|<sup>n</sup> = 1 <span>n = 3.8 at the head → 2 at the tail</span><br>` +
-      `${TRI.list.length.toLocaleString('en')} triangles <span>(body ${parts.body.toLocaleString('en')}, jaw, 2 flippers, 2 flukes)</span><br>` +
+      `${TRI.list.length.toLocaleString('en')} triangles <span>(body ${parts.body.toLocaleString('en')}, jaw, 36 teeth, 2 flippers, 2 flukes)</span><br>` +
       `P(triangle) ∝ area × (1 − ${(0.45 * S.skin).toFixed(2)} · (1 − tone))<br>` +
       `${dotCount.toLocaleString('en')} dots on ${TRI.area.toFixed(2)} units² of skin <span>(the whale is 2 units long)</span>`;
   }
   const fmt = {
     dots: (v) => (DOT_COUNTS[v] >= 1e6 ? DOT_COUNTS[v] / 1e6 + 'M' : DOT_COUNTS[v] / 1e3 + 'K'),
-    size: (v) => (+v).toFixed(1) + 'px', gather: (v) => (+v).toFixed(1), sea: (v) => Math.round(v * 100) + '%',
+    size: (v) => (+v).toFixed(1) + 'px', mouth: (v) => Math.round(v * 60) + '°', gather: (v) => (+v).toFixed(1), sea: (v) => Math.round(v * 100) + '%',
   };
-  const sliders = ['dots', 'size', 'brightness', 'tint', 'trail', 'rim', 'solid', 'skin', 'blur', 'focus', 'spin', 'swim', 'sea', 'shatter', 'gather'];
+  const sliders = ['dots', 'size', 'brightness', 'tint', 'trail', 'rim', 'solid', 'skin', 'blur', 'focus', 'spin', 'mouth', 'swim', 'sea', 'ripple', 'shatter', 'gather'];
   const press = (id, on) => document.getElementById(id).setAttribute('aria-pressed', String(on));
   function sync() {
     for (const id of sliders) {
       document.getElementById(id).value = S[id];
       document.querySelector(`output[for="${id}"]`).textContent = (fmt[id] || ((v) => (+v).toFixed(2)))(S[id]);
     }
-    press('inkOff', !S.ink); press('inkOn', S.ink);
+    press('inkOff', !S.ink); press('inkOn', S.ink); press('chewOn', S.chew); press('chewOff', !S.chew);
     document.documentElement.dataset.paper = String(S.ink);
   }
   let skinTimer = 0;
@@ -729,6 +809,8 @@
   });
   document.getElementById('inkOff').addEventListener('click', () => { S.ink = false; sync(); });
   document.getElementById('inkOn').addEventListener('click', () => { S.ink = true; sync(); });
+  document.getElementById('chewOn').addEventListener('click', () => { S.chew = true; mouthT = 0; sync(); });
+  document.getElementById('chewOff').addEventListener('click', () => { S.chew = false; sync(); });
   document.getElementById('viewSide').addEventListener('click', () => { cam.goal = VIEWS.side; cam.vyaw = cam.vpitch = 0; });
   document.getElementById('viewFront').addEventListener('click', () => { cam.goal = VIEWS.front; cam.vyaw = cam.vpitch = 0; });
   document.getElementById('regather').addEventListener('click', regather);
@@ -742,7 +824,7 @@
   const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
   tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
   sync();
-  window.whale = { S, cam, scatter, regather, settle() { gatherStart = clock - 99; shatterStart = clock - 99; }, get fps() { return fps; }, get dotCount() { return dotCount; }, get triangles() { return TRI.list.length; } };
+  window.whale = { skinAt, ripples, S, cam, scatter, regather, settle() { gatherStart = clock - 99; shatterStart = clock - 99; }, get fps() { return fps; }, get dotCount() { return dotCount; }, get triangles() { return TRI.list.length; } };
 })();
 </script>
 </body>

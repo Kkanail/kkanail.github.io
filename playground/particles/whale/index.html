@@ -158,12 +158,13 @@
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const touch = matchMedia('(pointer: coarse)').matches;
   const DOT_COUNTS = [50000, 100000, 200000, 400000, 800000];
+  // Kailan's settings (2026-11-13); phones get fewer dots, and reduced motion keeps the turning and swimming gentle
   const DEFAULTS = {
-    species: 'blue', xray: false, ink: false,
-    dots: touch ? 1 : 2, size: 1.8, brightness: 1, tint: 0.7, trail: 0.3,
-    rim: 0.8, solid: 1, skin: 0.7,
-    blur: 0.35, focus: 0, spin: reduceMotion ? 0 : 0.25,
-    swim: reduceMotion ? 0.3 : 1, roam: true, mouth: 0.7, chew: true, ripple: 1, sea: 0.06, shatter: reduceMotion ? 0.4 : 1, gather: 4,
+    species: 'blue', xray: true, ink: false,
+    dots: touch ? 1 : 2, size: 0.6, brightness: 1.96, tint: 0, trail: 0.64,
+    rim: 1.36, solid: 1, skin: 0.53,
+    blur: 0.25, focus: 1.15, spin: reduceMotion ? 0 : 0.87,
+    swim: reduceMotion ? 0.3 : 0.82, roam: true, mouth: 0.71, chew: false, ripple: 0.25, sea: 0.3, shatter: reduceMotion ? 0.4 : 0.67, gather: 4.8,
   };
   const S = { ...DEFAULTS };
 

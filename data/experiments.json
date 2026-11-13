@@ -1,5 +1,36 @@
 [
   {
+    "slug": "particle-whale",
+    "title": "Particle Whale",
+    "date": "2026-11-13",
+    "description": "A 3D blue whale made of 200,000 dots, X-rayed to show its skeleton, drifting through marine snow and out of the picture. Turn it, tap it for ripples, switch to a sperm whale or to ink on paper. Made with Claude.",
+    "tags": [
+      "AI",
+      "WebGL",
+      "Interaction"
+    ],
+    "label": "New",
+    "link": "/playground/particle-whale/",
+    "thumb": "/playground/particle-whale/thumb.jpg",
+    "how": "/notes/2026-11-13-particle-whale/",
+    "notes": "從粒子畫（把一張畫變成點）延伸出來：如果點不是撒在一張圖上，而是撒在一個 3D 物件的表面上呢？最早想做的是白鯨記裡的白鯨，所以第一隻是抹香鯨，方方的大頭、細細的下顎。\n\n後來想讓嘴巴會開合，做出來一直覺得怪，拿藍鯨的海報來比才發現我想要的是藍鯨的嘴：嘴巴線沿著頭的側面一路到眼睛下面，張開時看得到鯨鬚和喉褶。兩隻都留著，可以切換。\n\n再來是 X 光：皮膚變成半透明，裡面是頭骨、下顎骨、五十幾節脊椎和肋骨，還有胸鰭裡的指骨。最後把預設調成很多海雪、慢慢游出畫面的樣子，覺得很詩意。\n\n怎麼做的寫在 Notes 的「一隻用點畫出來的鯨魚」，給沒寫過程式的人看。",
+    "refs": [
+      {
+        "label": "國立海洋生物博物館 — 巨鯨之路 Reborn: The Blue Whale's Journey (poster)",
+        "note": "The blue whale's shape and mouth line"
+      },
+      {
+        "label": "Whale skeleton comparison illustration",
+        "note": "Reference for the X-ray skeleton (shared as an image)"
+      },
+      {
+        "label": "Herman Melville — Moby-Dick (1851)",
+        "url": "https://www.gutenberg.org/ebooks/2701",
+        "note": "The sperm whale's \"high, pyramidical white hump\" and wrinkled forehead"
+      }
+    ]
+  },
+  {
     "slug": "glass-k",
     "title": "Glass K",
     "date": "2026-11-10",

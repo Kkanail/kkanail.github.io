@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>一隻用點畫出來的鯨魚 — Kailan Huang</title>
+<meta name="description" content="Particle Whale 是怎麼做出來的：寫給沒寫過程式的人，七個可以直接玩的小步驟，從一圈一圈的切片，到一隻會游泳、會張嘴的鯨魚。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@400&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/site.css">
+<script type="module" src="/assets/js/site.js"></script>
+<style>
+  .article { max-width: 46rem; margin: 0 auto; padding: clamp(40px, 7vw, 88px) 16px 96px; display: flex; flex-direction: column; gap: 22px; }
+  .article .back { color: var(--mute); }
+  .article .back:hover { color: var(--accent); }
+  .article h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(36px, 5.4vw, 56px); line-height: 1.1; letter-spacing: -.02em; text-wrap: balance; }
+  .article .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .article p, .article li { font-size: 17px; line-height: 1.8; }
+  .article ul, .article ol { padding-left: 1.4em; display: flex; flex-direction: column; gap: 4px; }
+  .article h2 { font-family: var(--serif); font-weight: 400; font-size: 30px; line-height: 1.2; letter-spacing: -.01em; margin-top: 36px; display: flex; gap: 14px; align-items: baseline; text-wrap: balance; }
+  .article h2 .mono { color: var(--accent); flex: none; }
+  .article code { font-family: var(--mono); font-size: .88em; background: var(--side); padding: 1px 5px; border-radius: 3px; }
+  .article pre { font-family: var(--mono); font-size: 13px; line-height: 1.65; background: var(--side); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; overflow-x: auto; }
+  .article pre code { background: none; padding: 0; font-size: inherit; }
+  .lesson { border-left: 2px solid var(--accent); padding: 4px 0 4px 16px; color: var(--ink); }
+  .lesson b { font-weight: 600; }
+  .map { font-family: var(--mono); font-size: 13px; line-height: 1.9; background: var(--side); border: 1px solid var(--line); border-radius: 4px; padding: 16px; overflow-x: auto; white-space: pre; }
+  .demo { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--bg); }
+  .demo-canvas { position: relative; height: 300px; touch-action: pan-y; cursor: crosshair; }
+  .demo-canvas canvas { display: block; }
+  .demo.tall .demo-canvas { height: 420px; }
+  .demo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--side); }
+  .demo-bar label { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .demo-bar input[type=range] { accent-color: var(--accent); width: 130px; }
+  .demo-bar input[type=checkbox] { accent-color: var(--accent); }
+  .demo-bar output { color: var(--ink); font-variant-numeric: tabular-nums; min-width: 4.5em; }
+  .demo-bar .hint { font-family: var(--mono); font-size: 12px; color: var(--mute); margin-left: auto; }
+  table.math { border-collapse: collapse; width: 100%; font-size: 15px; }
+  table.math th, table.math td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.math th { font-family: var(--mono); font-size: 12px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 600px) { .demo-bar .hint { margin-left: 0; } .demo-canvas { height: 240px; } .demo.tall .demo-canvas { height: 340px; } }
+</style>
+</head>
+<body>
+<!-- NAV: keep identical on every page (only aria-current changes) -->
+<header class="site-nav">
+  <a class="brand" href="/">Kailan Huang</a>
+  <nav><ul>
+    <li><a href="/work/">Work</a></li>
+    <li><a href="/playground/">Playground</a></li>
+    <li><a href="/notes/" aria-current="page">Notes</a></li>
+    <li><a href="/about/">About</a></li>
+  </ul></nav>
+</header>
+<main>
+<article class="article">
+  <a class="mono back" href="/notes/">← Notes</a>
+  <h1>一隻用點畫出來的鯨魚</h1>
+  <div class="meta">
+    <span class="mono">2026-11-13</span>
+    <span class="mono" style="color:var(--accent)">Note · Tutorial</span>
+    <a class="mono" href="/playground/particles/whale/" style="color:var(--ink)">看完整的鯨魚 ↗</a>
+  </div>
+
+  <p><a href="/playground/particles/whale/">Particle Whale</a> 是一隻用二十萬顆點組成的 3D 藍鯨，會游泳、會張嘴，還可以照 X 光看骨頭。它看起來很難，但其實是幾個很簡單的想法疊在一起。這篇寫給完全沒寫過程式的人：七個步驟，每一步都有一個可以直接玩的小範例。拖拖看裡面的滑桿，或用滑鼠拖著鯨魚轉。</p>
+
+  <p>整隻鯨魚分四層，由下往上疊：</p>
+  <div class="map">④ 動起來    游泳的波浪、會開合的嘴巴
+③ 看得見    轉成畫面、打光、藏起背面
+② 撒點      把點撒在皮膚上
+① 形狀      一圈一圈的切片 → 三角形</div>
+  <p class="lesson"><b>最重要的一個觀念：鯨魚不是「畫」出來的，是「算」出來的。</b>程式裡沒有任何一張鯨魚的圖，只有一串數字：每個位置有多高、多寬。電腦從這些數字算出每一顆點該在哪裡、該多亮。</p>
+
+  <h2><span class="mono">01</span>形狀：一圈一圈的切片</h2>
+  <p>想像把鯨魚像麵包一樣切成很多片。每一片的切口都是一個圓圈，頭的地方小、身體中間大、尾巴又變小。把這些圈圈從頭到尾排成一排，鯨魚的形狀就出來了。</p>
+  <p>所以要描述一隻鯨魚，只需要一張很短的表：在身體的每個位置，<b>上面多高、下面多深、兩邊多寬</b>。表中間的數字，程式會自己用平滑的曲線補起來。</p>
+  <p>「方正度」這個數字決定每一圈是圓的還是方的。它是 2 的時候切口是橢圓，越大就越接近圓角方形。抹香鯨那顆像箱子的大頭，就是把頭部的方正度調高做出來的。</p>
+  <div class="demo" data-demo="sections">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w1-rings">Rings <input id="w1-rings" type="range" min="4" max="60" value="18"><output for="w1-rings"></output></label>
+      <label for="w1-square">Squareness <input id="w1-square" type="range" min="2" max="5" step="0.1" value="2.2"><output for="w1-square"></output></label>
+      <span class="hint">拖著轉轉看</span>
+    </div>
+  </div>
+  <pre><code>// 身體的每個位置 s（0 = 嘴尖，1 = 尾巴）：上面多高、下面多深、兩邊多寬
+const T = [0.018, 0.04, 0.058, … ];
+const B = [0.022, 0.05, 0.075, … ];
+const W = [0.03,  0.062, 0.09, … ];
+// 切口上的一個點：角度 th 繞一圈
+x = 1 - 2 * s;
+y = sin(th) * (上半圈 ? T : B);
+z = cos(th) * W;</code></pre>
+
+  <h2><span class="mono">02</span>把點連成三角形</h2>
+  <p>電腦的 3D 世界裡，所有的表面都是三角形拼出來的：遊戲角色、電影特效都一樣。為什麼是三角形？因為三個點一定在同一個平面上，不會歪掉，算起來最簡單。</p>
+  <p>相鄰兩圈上、彼此靠近的四個點，剛好可以切成兩個三角形。整隻鯨魚的皮膚就是幾萬個這樣的小三角形。下面紫色那一塊就是其中一個。</p>
+  <div class="demo" data-demo="triangles">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w2-points">Points per ring <input id="w2-points" type="range" min="4" max="40" value="14"><output for="w2-points"></output></label>
+      <span class="hint count"></span>
+    </div>
+  </div>
+
+  <h2><span class="mono">03</span>撒點：大的三角形分到比較多</h2>
+  <p>現在要把點撒在皮膚上。最直覺的做法是「每個三角形分一樣多顆」，但試試看把下面的開關關掉：嘴巴和尾巴附近的點會擠成一團。因為那裡的切片排得比較密，三角形比較小，同樣的點數擠在比較小的面積裡。</p>
+  <p>正確的做法是<b>照面積分</b>：三角形越大，分到點的機會越大。方法很像抽籤：把每個三角形的面積排成一條長長的尺，隨便丟一個數字，看它落在誰的範圍裡。大的三角形在尺上佔得長，就比較容易被抽中。</p>
+  <div class="demo" data-demo="dots">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w3-count">Dots <input id="w3-count" type="range" min="1000" max="20000" step="500" value="8000"><output for="w3-count"></output></label>
+      <label for="w3-area"><input id="w3-area" type="checkbox" checked> <output for="w3-area"></output></label>
+    </div>
+  </div>
+  <pre><code>// 把面積一個一個加起來，變成一條尺
+let total = 0;
+for (const t of triangles) { total += t.area; t.end = total; }
+// 抽籤：丟一個 0 ~ total 的數字，找出它落在哪個三角形
+const u = Math.random() * total;
+const t = triangles.find((t) =&gt; t.end &gt;= u);   // 真正的程式用「二分搜尋」，快很多</code></pre>
+  <p class="lesson">這招跟 <a href="/playground/particles/">Particle Painting</a> 一模一樣。那邊是「越亮的像素越容易分到點」，這邊是「越大的三角形越容易分到點」。同一個小技巧，換個地方用就變成新作品。</p>
+
+  <h2><span class="mono">04</span>轉成畫面：近大遠小</h2>
+  <p>點都有 3D 的座標了，但螢幕是平的。要把 3D 變成 2D，只要記住一件事：<b>離你越遠的東西看起來越小</b>。程式裡就是把位置除以距離：遠的點除以大的數字，就往畫面中間縮。</p>
+  <p>轉動鯨魚，其實是先把每一顆點繞著中心轉一個角度，再做「除以距離」。下面的滑桿是鏡頭的焦距：數字小就像廣角鏡頭，近大遠小很誇張；數字大就像長鏡頭，比較平。</p>
+  <div class="demo" data-demo="turn">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w4-focal">Lens <input id="w4-focal" type="range" min="0.6" max="6" step="0.1" value="2.4"><output for="w4-focal"></output></label>
+      <span class="hint">拖著轉轉看</span>
+    </div>
+  </div>
+  <pre><code>螢幕上的 x = 中心 + 點的 x × 焦距 ÷ 距離
+螢幕上的 y = 中心 − 點的 y × 焦距 ÷ 距離</code></pre>
+
+  <h2><span class="mono">05</span>打光：每顆點問自己面向哪裡</h2>
+  <p>每個三角形都有一個「朝向」，就是垂直於表面、往外指的方向，叫做<b>法線</b>。打光只需要問一個問題：<b>我面向光的程度有多少？</b>正對著光就是 1，側著是 0.5 左右，背對就是 0。這個數字用「內積」一行就算得出來。</p>
+  <p>網站上是墨水的版本：越背光，點越黑，跟畫素描時在暗面多畫幾筆一樣。把滑鼠移到範例上，光會跟著你。</p>
+  <p>「Outline」是另一個小技巧：邊緣的點是側著對你的，把它們加深，就像描了一圈輪廓線。</p>
+  <div class="demo" data-demo="light">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w5-rim">Outline <input id="w5-rim" type="range" min="0" max="1.5" step="0.05" value="0.6"><output for="w5-rim"></output></label>
+      <span class="hint">滑鼠移過來：光跟著你</span>
+    </div>
+  </div>
+  <pre><code>面向光的程度 = 法線 · 光的方向       // 內積：兩個方向越一致，數字越大
+點的深淺 = 1 − 面向光的程度          // 墨水版：越背光越黑</code></pre>
+
+  <h2><span class="mono">06</span>藏起背面</h2>
+  <p>點是一顆一顆疊上去的，電腦不會自動知道誰擋住誰。如果什麼都不做，你會同時看到鯨魚靠近你這一側和另一側的皮膚，整隻變成透明的。把下面的開關關掉試試，紫色的點就是本來應該被擋住的背面。</p>
+  <p>最簡單的判斷方法是看法線：<b>朝向背對你的點，就是在背面</b>。這招對一顆蛋形的身體夠用了，但鯨魚有鰭、有張開的嘴巴，有時候面向你的點還是會被別的部位擋住。</p>
+  <p>真正的版本用的方法是：每一幀先把鯨魚的皮膚畫成一張看不見的「距離圖」，記下每個像素離鏡頭最近的皮膚有多遠。接著每顆點都去查一下：如果我比那張圖上記的還遠，就代表我被擋住了。X 光模式就是把這張圖分成兩張，一張給皮膚，一張給骨頭。</p>
+  <div class="demo" data-demo="hide">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w6-hide"><input id="w6-hide" type="checkbox" checked> Hide the far side <output for="w6-hide"></output></label>
+    </div>
+  </div>
+
+  <h2><span class="mono">07</span>動起來：游泳和張嘴</h2>
+  <p><b>游泳</b>：鯨魚的尾巴是上下擺的（魚是左右擺）。做法是讓每顆點的高度加上一個 <code>sin</code> 波：越靠近尾巴，擺的幅度越大；時間一直往前，波就沿著身體往尾巴跑。</p>
+  <p><b>張嘴</b>：藍鯨的嘴巴線從嘴尖沿著頭的側邊，一路到眼睛下方。嘴巴線以下的點就是下顎，張嘴的時候它們一起繞著嘴角的「關節」轉一個角度。嘴角附近的點只轉一部分，嘴角才會是收起來的，不會整片掉下來。</p>
+  <div class="demo" data-demo="move">
+    <div class="demo-canvas"></div>
+    <div class="demo-bar">
+      <label for="w7-swim">Swim <input id="w7-swim" type="range" min="0" max="1.5" step="0.05" value="0.8"><output for="w7-swim"></output></label>
+      <label for="w7-mouth">Mouth <input id="w7-mouth" type="range" min="0" max="40" step="1" value="20"><output for="w7-mouth"></output></label>
+    </div>
+  </div>
+  <pre><code>// 游泳：越靠近尾巴擺越大，波往尾巴跑
+y += 擺幅 × (靠近尾巴的程度)² × sin(時間 × 速度 + 3.2 × x);
+// 張嘴：下顎的點繞著嘴角轉
+if (在嘴巴線以下) 把點繞著嘴角轉 (張嘴角度 × 離嘴角多遠);</code></pre>
+
+  <h2><span class="mono">+</span>二十萬顆點，交給顯示卡</h2>
+  <p>上面的範例是一般的程式，一顆一顆慢慢算，用一萬多顆點就差不多是極限了。真正的鯨魚有二十萬顆，每秒要算 60 次，等於一秒算一千兩百萬顆點的位置和亮度。</p>
+  <p>這種工作要交給<b>顯示卡（GPU）</b>。電腦的主處理器像一個很聰明的人，一件一件做事；顯示卡像幾千個只會做簡單算術的小幫手，同時一起做。我們寫一段小程式叫做 <b>shader</b>，告訴每個小幫手「拿到一顆點時要做什麼」：游泳、張嘴、轉成畫面、打光、查距離圖。幾千個小幫手同時跑同一段程式，二十萬顆點就一下子算完了。這個網頁用的是 <code>WebGL2</code>，瀏覽器內建，不用裝任何東西。</p>
+  <p>點最後是「疊加」上去的：同一個位置疊越多顆點就越亮，所以點越密的地方看起來越亮、越實。殘影（Trails）是每一幀不完全擦掉上一幀，留下一點點，動起來就有拖尾的感覺。</p>
+
+  <h2><span class="mono">+</span>會用到的數學</h2>
+  <p>不用先學完，遇到再查就好：</p>
+  <div class="table-wrap"><table class="math">
+    <thead><tr><th>工具</th><th>白話</th><th>在哪用</th></tr></thead>
+    <tbody>
+      <tr><td><code>sin</code> / <code>cos</code></td><td>繞圈圈；也能做來回的波動</td><td>切片的圓圈、游泳</td></tr>
+      <tr><td>三角形面積</td><td>兩條邊的「外積」長度的一半</td><td>撒點的抽籤</td></tr>
+      <tr><td>內積</td><td>兩個方向有多一致</td><td>打光、判斷背面</td></tr>
+      <tr><td>旋轉</td><td>用 <code>sin</code>、<code>cos</code> 把點繞一個中心轉</td><td>轉動鯨魚、張嘴</td></tr>
+      <tr><td>除以距離</td><td>遠的東西變小</td><td>3D 轉成畫面</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="mono">+</span>做的過程中學到的事</h2>
+  <ol>
+    <li><b>第一版整隻黑漆漆</b>：點太少、每顆太暗，疊起來還是黑的。後來改成先算「每個像素平均會分到幾顆點」，再決定每顆要多亮，換點數、換大小，亮度都不會跑掉。</li>
+    <li><b>從正面看得到肚子裡的尾巴</b>：點都疊在一起，後面的也會透出來。這就是第 06 步那張「距離圖」的由來。</li>
+    <li><b>我搞錯鯨魚種類</b>：一開始做的是白鯨記裡的抹香鯨，嘴巴是一根細細的下顎，我一直覺得怪。後來拿藍鯨的海報來比，才發現我想要的是藍鯨的嘴。最後兩隻都留下來，可以切換。</li>
+  </ol>
+  <p class="lesson">一個除錯小習慣：<b>用數字確認，不要只靠眼睛。</b>有一次我以為「藏起背面」壞了，把正面的點也藏掉了。把距離圖上的數字印出來看，才發現它是對的，只是正面剛好背光、太暗而已。</p>
+  <p>完整的程式碼在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/playground/particles/whale/index.html" target="_blank" rel="noopener" style="text-decoration:underline">GitHub ↗</a>，這篇的範例在 <a href="https://github.com/Kkanail/kkanail.github.io/blob/main/notes/2026-11-13-particle-whale/demos.js" target="_blank" rel="noopener" style="text-decoration:underline">demos.js ↗</a>。</p>
+</article>
+</main>
+<!-- FOOTER: keep identical on every page -->
+<footer class="site-foot">
+  <span class="mono">© 2026 Kailan Huang</span>
+  <a class="mono email" href="mailto:kailanxh@gmail.com">kailanxh@gmail.com</a>
+  <a class="mono" href="/assets/kailan-huang-cv.pdf">Download CV</a>
+</footer>
+<script type="module" src="./demos.js"></script>
+</body>
+</html>

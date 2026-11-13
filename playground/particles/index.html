@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Particle Painting — Playground — Kailan Huang</title>
+<meta name="description" content="A painting made of dots: each dot lands where the picture is bright. Stir them with your finger, tap to shatter the picture into the next one, or try your own image.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/exp-bar.css">
+<style>
+  :root { --bg: #000000; --ink: #f2ede8; --mute: #8d8a86; --line: #2a2a2c; --panel: #0e0e0f; --accent: #b9a8ff; }
+  :root[data-paper="true"] { --bg: #f6f3ee; --ink: #101820; --mute: #6b6f76; --line: #e3e3e3; --panel: #ffffff; --accent: #6e56cf; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font: 15px/1.5 "Open Sans", -apple-system, sans-serif; }
+
+  #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+  .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: var(--mute);
+              font: 12px/1.6 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; }
+
+  .bar { position: fixed; left: 16px; right: 16px; top: 16px; z-index: 3; display: flex; align-items: center; gap: 16px; pointer-events: none; }
+  .bar > * { pointer-events: auto; }
+  .bar .crumbs { background: color-mix(in srgb, var(--bg) 72%, transparent); padding: 4px 10px 6px; margin: -4px 0 0 -10px; border-radius: 4px; flex: 0 1 auto; }
+  .hint { position: fixed; left: 16px; bottom: 16px; z-index: 2; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em;
+          text-transform: uppercase; color: var(--mute); pointer-events: none; }
+
+  .panel { position: fixed; right: 16px; top: 64px; bottom: 16px; width: 280px; z-index: 3; overflow-y: auto;
+           background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+  .panel h3 { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 400; margin-bottom: 10px; }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+  .row + .row, .row + .switch, .switch + .row, .modes + .row { margin-top: 12px; }
+  .row label { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+  .row output { font: 12px "DM Mono", ui-monospace, monospace; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .hint-text { font-size: 12px; line-height: 1.5; color: var(--mute); margin-top: 8px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+  .actions button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+                    background: none; color: var(--ink); border-radius: 999px; padding: 9px 10px; cursor: pointer; }
+  .actions button:hover { border-color: var(--ink); }
+  .actions .primary { grid-column: 1 / -1; background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .copied { grid-column: 1 / -1; font: 12px "DM Mono", ui-monospace, monospace; color: var(--accent); min-height: 1.4em; text-align: center; }
+  textarea.settings { grid-column: 1 / -1; width: 100%; font: 11px/1.5 "DM Mono", ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
+  button:focus-visible, input:focus-visible, a:focus-visible, label.file:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .scenes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .scenes button { font: 15px "Newsreader", Georgia, serif; border: 1px solid var(--line); background: none; color: var(--mute); border-radius: 4px; padding: 6px; cursor: pointer; }
+  .scenes button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+  .scenes button[hidden] { display: none; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+  .modes button { font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line);
+                  background: none; color: var(--mute); border-radius: 4px; padding: 9px 6px; cursor: pointer; }
+  .modes button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+  .file { display: block; margin-top: 12px; text-align: center; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+          border: 1px dashed var(--line); color: var(--ink); border-radius: 4px; padding: 9px 8px; cursor: pointer; }
+  .file:hover { border-color: var(--ink); }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* how it's sampled: picture → brightness → dots */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .steps figure { margin: 0; }
+  .steps canvas { width: 100%; aspect-ratio: 4 / 3; display: block; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
+  .steps figcaption { font: 10px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); margin-top: 4px; text-align: center; }
+  .math { font: 11px/1.7 "DM Mono", ui-monospace, monospace; color: var(--ink); margin-top: 10px; overflow-wrap: anywhere; }
+  .math span { color: var(--mute); }
+
+  .toggle-panel { display: none; }
+  @media (max-width: 760px) {
+    .hint { bottom: 62px; }
+    .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 58vh; transform: translateY(calc(100% - 46px)); transition: transform .25s; gap: 18px; }
+    .panel.open { transform: none; }
+    .toggle-panel { display: block; font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase;
+                    background: none; border: 0; color: var(--ink); text-align: left; padding: 0 0 4px; cursor: pointer; }
+  }
+  @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="A painting drawn with glowing dots. Drag to stir the dots; tap to shatter the picture into the next one."></canvas>
+<div class="bar top">
+  <nav class="crumbs" aria-label="Breadcrumb">
+    <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
+    <a class="crumb-link" href="/playground/">Playground</a><span class="crumb-sep">/</span>
+    <h1 class="crumb-here">Particle Painting</h1>
+  </nav>
+</div>
+<p class="hint">Drag to stir · tap to shatter</p>
+
+<aside class="panel" id="panel" aria-label="Particle settings">
+  <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
+  <section>
+    <h3>Picture</h3>
+    <div class="scenes" role="group" aria-label="Picture">
+      <button type="button" data-scene="0" aria-pressed="false">I</button>
+      <button type="button" data-scene="1" aria-pressed="true">II</button>
+      <button type="button" data-scene="2" aria-pressed="false">III</button>
+      <button type="button" data-scene="3" aria-pressed="false" hidden>★</button>
+    </div>
+    <label class="file">Use your own image<input type="file" id="file" accept="image/*" class="visually-hidden"></label>
+    <div class="modes" role="group" aria-label="Light or ink">
+      <button type="button" id="inkOff" aria-pressed="true">Light on black</button>
+      <button type="button" id="inkOn" aria-pressed="false">Ink on paper</button>
+    </div>
+    <div class="modes" role="group" aria-label="Fit">
+      <button type="button" id="fitFill" aria-pressed="true">Fill screen</button>
+      <button type="button" id="fitWhole" aria-pressed="false">Whole picture</button>
+    </div>
+    <p class="hint-text">Your image stays in this browser; it isn’t uploaded anywhere. Ink on paper flips the idea: dots land where the picture is dark.</p>
+  </section>
+  <section>
+    <h3>How it’s sampled</h3>
+    <div class="steps">
+      <figure><canvas id="stepImg" width="120" height="90"></canvas><figcaption>Picture</figcaption></figure>
+      <figure><canvas id="stepLum" width="120" height="90"></canvas><figcaption>Chance</figcaption></figure>
+      <figure><canvas id="stepDots" width="120" height="90"></canvas><figcaption>Dots</figcaption></figure>
+    </div>
+    <p class="math" id="math"></p>
+    <p class="hint-text">1 · Read each pixel’s brightness L. 2 · Stretch the picture’s range so its darkest 2% is 0 and brightest 0.5% is 1. 3 · Raise to the power γ (Contrast) and add a little Fill: that is each pixel’s chance of getting a dot. 4 · Throw the dots: pick a random number, find which pixel it falls in on the running total (a binary search). Bright areas collect many dots. Each dot keeps only its pixel’s hue — brightness comes from how crowded the dots are.</p>
+  </section>
+  <section>
+    <h3>Dots</h3>
+    <div class="row"><label for="dots">Dots</label><output for="dots"></output><input id="dots" type="range" min="0" max="5" step="1"></div>
+    <div class="row"><label for="contrast">Contrast (γ)</label><output for="contrast"></output><input id="contrast" type="range" min="0.5" max="4" step="0.1"></div>
+    <div class="row"><label for="fill">Fill</label><output for="fill"></output><input id="fill" type="range" min="0" max="0.1" step="0.002"></div>
+    <div class="row"><label for="size">Dot size</label><output for="size"></output><input id="size" type="range" min="1" max="8" step="0.1"></div>
+    <div class="row"><label for="brightness">Brightness</label><output for="brightness"></output><input id="brightness" type="range" min="0.1" max="2" step="0.01"></div>
+    <div class="row"><label for="tint">Colour</label><output for="tint"></output><input id="tint" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="trail">Trails</label><output for="trail"></output><input id="trail" type="range" min="0" max="0.95" step="0.01"></div>
+    <p class="hint-text">Fewer, bigger dots read as pointillism; many small ones read as a photo. Contrast 1 = dots follow brightness exactly; higher pushes them into the highlights and leaves the shadows empty. Trails = how much of the last frame stays: smooth paint when still, streaks when moving.</p>
+  </section>
+  <section>
+    <h3>Motion</h3>
+    <div class="row"><label for="stir">Stir</label><output for="stir"></output><input id="stir" type="range" min="0" max="2" step="0.01"></div>
+    <div class="row"><label for="reach">Stir reach</label><output for="reach"></output><input id="reach" type="range" min="0.03" max="0.4" step="0.01"></div>
+    <div class="row"><label for="shatter">Shatter</label><output for="shatter"></output><input id="shatter" type="range" min="0" max="2" step="0.01"></div>
+    <div class="row"><label for="morph">Morph (s)</label><output for="morph"></output><input id="morph" type="range" min="0.8" max="8" step="0.1"></div>
+    <div class="row"><label for="shimmer">Shimmer</label><output for="shimmer"></output><input id="shimmer" type="range" min="0" max="1" step="0.01"></div>
+    <div class="row"><label for="focus">Focus</label><output for="focus"></output><input id="focus" type="range" min="0" max="1" step="0.01"></div>
+    <p class="hint-text">Stir: your finger drags nearby dots along with it, and they drift back home. Shatter: how far the dots fly when you tap; near the tap they go first and farthest. Morph = how long they take to gather into the next picture. Focus 0 leaves them scattered.</p>
+  </section>
+  <section class="actions">
+    <button type="button" id="next">Next picture</button>
+    <button type="button" id="reset">Reset</button>
+    <button type="button" id="copy" class="primary">Copy settings</button>
+    <div class="copied" id="copied" aria-live="polite"></div>
+    <textarea class="settings" id="settings" rows="6" hidden aria-label="Settings to copy" readonly></textarea>
+  </section>
+</aside>
+
+<script>
+(() => {
+  'use strict';
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const DOT_COUNTS = [20000, 50000, 100000, 200000, 400000, 800000];
+  const DEFAULTS = {
+    ink: false, fit: 'fill',
+    dots: 2, contrast: 2.4, fill: 0.004, size: 3, brightness: 0.5, tint: 1, trail: 0.35,
+    stir: reduceMotion ? 0.5 : 1, reach: 0.14, shatter: reduceMotion ? 0.4 : 1, morph: 3.6, shimmer: reduceMotion ? 0 : 0.3, focus: 1,
+  };
+  const S = { ...DEFAULTS };
+
+  const canvas = document.getElementById('stage');
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: false });
+  const fail = (msg) => { canvas.remove(); document.body.insertAdjacentHTML('afterbegin', `<div class="fallback">${msg}</div>`); };
+  if (!gl) return fail('This experiment needs WebGL2.');
+  if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) return fail('This browser can’t render float textures, which this experiment needs.');
+
+  // =====================================================================
+  // SHADERS
+  // =====================================================================
+  const STIR_MAX = 40;
+  const DOT_VS = `#version 300 es
+  precision highp float;
+  layout(location = 0) in vec2 aHomeA; layout(location = 1) in vec3 aColA; layout(location = 2) in vec2 aHomeB; layout(location = 3) in vec3 aColB;
+  uniform float uMix; uniform vec2 uCoverA; uniform vec2 uCover; uniform vec2 uOrigin; uniform float uAspect;
+  uniform float uFocus; uniform float uTime; uniform float uSize; uniform float uFrame; uniform vec2 uPx;
+  uniform float uShatter; uniform float uShimmer;
+  uniform vec4 uStir[${STIR_MAX}]; uniform float uStirAge[${STIR_MAX}]; uniform int uStirN; uniform float uReach; uniform float uStirAmt;
+  out vec3 vCol;
+  uint hash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+  vec2 rnd2(uint h) { uint h2 = hash(h ^ 0x9e3779b9u); return vec2(float(h & 0xffffu), float(h2 & 0xffffu)) / 65535.0 - 0.5; }
+  void main() {
+    uint id = uint(gl_VertexID);
+    // home in screen space (x in 0..aspect, y in 0..1)
+    vec2 ua = ((aHomeA - 0.5) * uCoverA + 0.5) * vec2(uAspect, 1.0);
+    vec2 ub = ((aHomeB - 0.5) * uCover + 0.5) * vec2(uAspect, 1.0);
+    // from home A to home B, starting near the tap and spreading outward
+    vec2 fromHit = ua - uOrigin; float dist = length(fromHit);
+    float tt = clamp((uMix - clamp(dist * 0.175, 0.0, 0.25)) / 0.75, 0.0, 1.0);
+    float e = tt * tt * (3.0 - 2.0 * tt);
+    vec2 p = mix(ua, ub, e);
+    // shatter: dots fly away from the tapped point, near ones first and farthest, then fall into the next picture
+    float delay = clamp(dist * 0.35, 0.0, 0.45);
+    float t = clamp((uMix - delay * 0.5) / (1.0 - delay * 0.5), 0.0, 1.0);
+    float out_ = sin(3.14159265 * t) * (0.55 + 0.6 * exp(-dist * 2.5));
+    vec2 radial = normalize(fromHit + 1e-4) * 0.9 + rnd2(hash(id * 3u)) * 1.8;
+    p += radial * out_ * 0.5 * uShatter;
+    // stir: every recent finger sample drags dots near it along its motion; the pull rises, then lets go
+    for (int i = 0; i < ${STIR_MAX}; i++) {
+      if (i >= uStirN) break;
+      vec4 s = uStir[i]; float a = uStirAge[i];
+      vec2 d = p - s.xy;
+      float f = exp(-dot(d, d) / (uReach * uReach));
+      float env = (a / 0.25) * exp(1.0 - a / 0.25);              // peaks 0.25 s after the finger passed, gone in ~2 s
+      p += (s.zw * 0.06 + normalize(d + 1e-5) * 0.012 * length(s.zw)) * f * env * uStirAmt;
+    }
+    // shimmer: each dot breathes on its own slow circle; out of focus: each drifts far away
+    vec2 dir = rnd2(hash(id));
+    float ph = dir.x * 40.0;
+    p += vec2(sin(uTime * 0.9 + ph), cos(uTime * 0.7 + ph * 1.3)) * 0.004 * uShimmer;
+    float blur = (1.0 - uFocus); blur *= blur;
+    p += (dir * 1.6 + 0.04 * vec2(sin(uTime * 0.8 + ph), cos(uTime * 0.66 + ph * 1.3))) * blur;
+    // a new sub-pixel nudge every frame: with trails, the grain melts into smooth paint
+    p += rnd2(hash(id ^ hash(uint(uFrame) + 7u))) * uPx * vec2(uAspect, 1.0) * 0.6;
+    gl_Position = vec4(p / vec2(uAspect, 1.0) * 2.0 - 1.0, 0.0, 1.0);
+    gl_PointSize = uSize;
+    vCol = mix(aColA, aColB, e);
+  }`;
+  const DOT_FS = `#version 300 es
+  precision highp float; in vec3 vCol; uniform float uWeight; out vec4 o;
+  void main() { float d = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.25, d); o = vec4(vCol * uWeight * a, 1.0); }`;
+  const QUAD_VS = `#version 300 es
+  out vec2 vUv; void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+  const FADE_FS = `#version 300 es
+  precision mediump float; out vec4 o; void main() { o = vec4(0.0); }`;
+  // light: the dots add up to light on black. ink: the dots add up to ink that soaks up light from the paper.
+  const SHOW_FS = `#version 300 es
+  precision highp float; in vec2 vUv; out vec4 o;
+  uniform sampler2D uAcc; uniform float uBright; uniform float uTint; uniform int uInk; uniform vec3 uPaper;
+  void main() {
+    vec3 a = texture(uAcc, vUv).rgb;
+    a = mix(vec3(dot(a, vec3(0.2126, 0.7152, 0.0722))), a, uTint);
+    if (uInk == 0) { vec3 c = 1.0 - exp(-a * uBright); o = vec4(pow(c, vec3(1.3)), 1.0); }
+    else { o = vec4(uPaper * exp(-a * uBright * 1.4), 1.0); }
+  }`;
+  function compile(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function program(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const name = gl.getActiveUniform(p, i).name.replace(/\[0\]$/, ''); u[name] = gl.getUniformLocation(p, name); }
+    return { p, u };
+  }
+  let dotP, fadeP, showP;
+  try { dotP = program(DOT_VS, DOT_FS); fadeP = program(QUAD_VS, FADE_FS); showP = program(QUAD_VS, SHOW_FS); }
+  catch (e) { console.error(e); return fail('Couldn’t start WebGL on this device.'); }
+  const emptyVao = gl.createVertexArray(), dotVao = gl.createVertexArray();
+
+  let W = 0, H = 0, aspect = 1, dpr = 1, acc = null;
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr)), h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (w === W && h === H) return;
+    W = canvas.width = w; H = canvas.height = h; aspect = w / h;
+    if (acc) { gl.deleteTexture(acc.tex); gl.deleteFramebuffer(acc.fb); }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    acc = { tex, fb };
+  }
+  let resizeTimer = 0;
+  new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, acc ? 120 : 0); }).observe(canvas);
+  resize();
+
+  // =====================================================================
+  // PICTURES → DOTS
+  // =====================================================================
+  // public-domain paintings (the same three as Turner Underwater); slot 3 holds the visitor's own image
+  const SCENES = [
+    { src: '/playground/turner/whalers-turner.jpg' },
+    { src: '/playground/turner/whale-storm.jpg' },
+    { src: '/playground/turner/whale-boats.jpg' },
+  ];
+  function loadScene(i, src) {
+    const sc = (SCENES[i] = { src, aspect: 4 / 3, dots: {} });
+    const img = new Image();
+    img.onload = () => {
+      sc.aspect = img.naturalWidth / img.naturalHeight;
+      const w = 640, h = Math.max(1, Math.round(640 / sc.aspect));   // a small copy to read brightness from
+      const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      sc.img = c; sc.px = { w, h, data: ctx.getImageData(0, 0, w, h).data };
+      if (i === sceneA || i === sceneB) built = -1;
+      if (i === shownScene()) drawSteps();
+    };
+    img.onerror = () => console.warn('Could not load', src);
+    img.src = src;
+    return sc;
+  }
+  SCENES.forEach((sc, i) => loadScene(i, sc.src));
+
+  // the chance of each pixel getting a dot, as a running total (cumulative distribution)
+  function chanceOf(sc) {
+    const key = `${S.ink}|${S.contrast}|${S.fill}`;
+    if (sc.chance && sc.chance.key === key) return sc.chance;
+    const { w, h, data: px } = sc.px, N = w * h;
+    const lum = new Float32Array(N), hist = new Uint32Array(256);
+    for (let i = 0; i < N; i++) {
+      let l = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255;
+      if (S.ink) l = 1 - l;                                   // ink goes where the picture is dark
+      lum[i] = l; hist[Math.min(255, (l * 255) | 0)]++;
+    }
+    let run = 0, lo = 0, hi = 255;
+    for (let v = 0; v < 256; v++) { run += hist[v]; if (run < N * 0.02) lo = v; if (run < N * 0.995) hi = v; }
+    const p = new Float32Array(N), cdf = new Float32Array(N); let sum = 0;
+    for (let i = 0; i < N; i++) {
+      const l = Math.min(1, Math.max(0, (lum[i] * 255 - lo) / Math.max(1, hi - lo)));
+      p[i] = Math.pow(l, S.contrast) + S.fill; sum += p[i]; cdf[i] = sum;
+    }
+    sc.dots = {};
+    return (sc.chance = { key, p, cdf, sum, lo: lo / 255, hi: hi / 255 });
+  }
+  function pick(ch, N) {
+    const u = Math.random() * ch.sum;
+    let a = 0, b = N - 1;
+    while (a < b) { const m = (a + b) >> 1; if (ch.cdf[m] < u) a = m + 1; else b = m; }
+    return a;
+  }
+  // each dot: home (x, y in 0..1) + colour. The colour is the pixel's hue at even brightness (light) or its ink colour (ink).
+  function dotsOf(sc, n) {
+    const out = new Float32Array(n * 5);
+    if (!sc || !sc.px) return out;
+    const ch = chanceOf(sc);
+    if (sc.dots[n]) return sc.dots[n];
+    const { w, h, data: px } = sc.px, N = w * h;
+    for (let k = 0; k < n; k++) {
+      const i = pick(ch, N), x = i % w, y = (i / w) | 0;
+      let r = px[i * 4] / 255, g = px[i * 4 + 1] / 255, b = px[i * 4 + 2] / 255;
+      if (S.ink) { r = 1 - r; g = 1 - g; b = 1 - b; }       // ink = the light the pixel soaks up
+      const l = Math.max(0.06, 0.2126 * r + 0.7152 * g + 0.0722 * b);
+      out.set([(x + Math.random()) / w, 1 - (y + Math.random()) / h, Math.min(3, r / l), Math.min(3, g / l), Math.min(3, b / l)], k * 5);
+    }
+    return (sc.dots[n] = out);
+  }
+  // one buffer holds both homes: where each dot is coming from (A) and going to (B)
+  const dotBuf = gl.createBuffer();
+  gl.bindVertexArray(dotVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
+  [[0, 2, 0], [1, 3, 8], [2, 2, 20], [3, 3, 28]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 40, off); });
+  gl.bindVertexArray(emptyVao);
+  let sceneA = 1, sceneB = 1, mixStart = -99, built = -1, dotCount = 0, clock = 0;
+  function buildDots(n) {
+    const a = dotsOf(SCENES[sceneA], n), b = dotsOf(SCENES[sceneB], n), buf = new Float32Array(n * 10);
+    for (let k = 0; k < n; k++) { buf.set(a.subarray(k * 5, k * 5 + 5), k * 10); buf.set(b.subarray(k * 5, k * 5 + 5), k * 10 + 5); }
+    gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, buf, gl.STATIC_DRAW);
+    dotCount = n; built = n;
+  }
+  const sceneMix = () => Math.min(1, Math.max(0, (clock - mixStart) / S.morph));
+  const shownScene = () => (sceneMix() > 0.5 ? sceneB : sceneA);
+  let hitAt = [0.5, 0.5];
+  function goTo(i, at) {
+    if (!SCENES[i] || (i === sceneB && sceneMix() >= 1)) return;
+    hitAt = at || [0.5, 0.5];
+    sceneA = sceneMix() > 0.5 ? sceneB : sceneA; sceneB = i; mixStart = clock; built = -1;
+    sync(); drawSteps();
+  }
+  const nextScene = () => (shownScene() + 1) % SCENES.length;
+  // how big the picture is on screen (picture uv = (screen uv − 0.5) / fit + 0.5)
+  const coverOf = (sc) => {
+    const ia = sc ? sc.aspect : 4 / 3;
+    if (S.fit === 'whole') { const m = 0.9; return aspect > ia ? [m * ia / aspect, m] : [m, m * aspect / ia]; }
+    if (aspect >= 1) return aspect > ia ? [1, aspect / ia] : [ia / aspect, 1];
+    const z = 1.12; return [z, z * aspect / ia];               // phones: the whole width, a little enlarged
+  };
+
+  // =====================================================================
+  // HOW IT'S SAMPLED — three small pictures and the numbers behind them
+  // =====================================================================
+  const stepCtx = ['stepImg', 'stepLum', 'stepDots'].map((id) => document.getElementById(id).getContext('2d'));
+  const mathEl = document.getElementById('math');
+  function drawSteps() {
+    const sc = SCENES[shownScene()];
+    if (!sc || !sc.px) return;
+    const ch = chanceOf(sc), { w, h } = sc.px, CW = 120, CH = 90;
+    const fit = (ctx) => { const s = Math.min(CW / w, CH / h); return [s, (CW - w * s) / 2, (CH - h * s) / 2]; };
+    const [s, ox, oy] = fit(stepCtx[0]);
+    const paper = S.ink ? '#f6f3ee' : '#000';
+    stepCtx.forEach((c) => { c.fillStyle = paper; c.fillRect(0, 0, CW, CH); });
+    stepCtx[0].drawImage(sc.img, ox, oy, w * s, h * s);
+    // chance map: brighter = more likely to get a dot
+    const tw = Math.round(w * s), th = Math.round(h * s), im = stepCtx[1].createImageData(tw, th);
+    let max = 0; for (let i = 0; i < ch.p.length; i += 7) max = Math.max(max, ch.p[i]);
+    for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+      const v = Math.min(1, ch.p[((y / s) | 0) * w + ((x / s) | 0)] / max), o = (y * tw + x) * 4;
+      const g = S.ink ? 246 - v * 230 : v * 255;
+      im.data[o] = im.data[o + 1] = im.data[o + 2] = g; im.data[o + 3] = 255;
+    }
+    stepCtx[1].putImageData(im, Math.round(ox), Math.round(oy));
+    // a few thousand dots thrown the same way
+    stepCtx[2].fillStyle = S.ink ? '#101820' : '#f2ede8';
+    for (let k = 0; k < 2500; k++) { const i = pick(ch, w * h); stepCtx[2].fillRect(ox + (i % w) * s, oy + ((i / w) | 0) * s, 0.8, 0.8); }
+    const n = DOT_COUNTS[S.dots];
+    mathEl.innerHTML =
+      `L = 0.2126R + 0.7152G + 0.0722B${S.ink ? ' <span>→ 1 − L (ink)</span>' : ''}<br>` +
+      `L′ = (L − ${ch.lo.toFixed(2)}) / (${ch.hi.toFixed(2)} − ${ch.lo.toFixed(2)}) <span>stretch</span><br>` +
+      `P(pixel) ∝ L′<sup>${(+S.contrast).toFixed(1)}</sup> + ${(+S.fill).toFixed(3)}<br>` +
+      `${n.toLocaleString('en')} dots ÷ ${(w * h).toLocaleString('en')} pixels <span>≈ ${(n / (w * h)).toFixed(2)} per pixel on average</span>`;
+  }
+
+  // =====================================================================
+  // INPUT — drag to stir, tap to shatter
+  // =====================================================================
+  const stir = [];                                   // recent finger samples: x, y, vx, vy (screen-height units), time
+  const stirBuf = new Float32Array(STIR_MAX * 4), stirAge = new Float32Array(STIR_MAX);
+  let down = null, lastMove = null;
+  const toScreen = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.height, 1 - (e.clientY - r.top) / r.height]; };
+  function addStir(e) {
+    const p = toScreen(e), t = performance.now() / 1000;
+    if (lastMove && t - lastMove.t < 0.03) return;
+    if (lastMove && t - lastMove.t < 0.25) {
+      const dt = Math.max(0.016, t - lastMove.t);
+      let vx = (p[0] - lastMove.p[0]) / dt, vy = (p[1] - lastMove.p[1]) / dt;
+      const sp = Math.hypot(vx, vy); if (sp > 4) { vx *= 4 / sp; vy *= 4 / sp; }
+      stir.push({ x: p[0], y: p[1], vx, vy, t: clock });
+      if (stir.length > STIR_MAX) stir.shift();
+    }
+    lastMove = { p, t };
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false }; lastMove = null;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) down.moved = true;
+    if (down || e.pointerType === 'mouse') addStir(e);    // a mouse stirs gently just by passing over
+  });
+  const end = (e) => {
+    if (down && !down.moved && performance.now() - down.t < 400 && sceneMix() >= 0.85) {
+      const r = canvas.getBoundingClientRect();
+      goTo(nextScene(), [(e.clientX - r.left) / r.height, 1 - (e.clientY - r.top) / r.height]);
+    }
+    down = null;
+  };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', () => { down = null; });
+
+  // =====================================================================
+  // FRAME
+  // =====================================================================
+  let last = performance.now() / 1000, frameNo = 0;
+  function frame() {
+    const t = performance.now() / 1000, dt = Math.min(0.05, t - last); last = t;
+    clock += dt * (reduceMotion ? 0.6 : 1); frameNo = (frameNo + 1) % 4096;
+    while (stir.length && clock - stir[0].t > 2.5) stir.shift();
+
+    const sc = SCENES[sceneB];
+    const want = DOT_COUNTS[S.dots];
+    if (sc && sc.px && built !== want) buildDots(want);
+    const keep = S.trail;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, acc.fb);
+    gl.viewport(0, 0, W, H);
+    gl.enable(gl.BLEND);
+    gl.blendColor(keep, keep, keep, keep); gl.blendFunc(gl.ZERO, gl.CONSTANT_COLOR);
+    gl.bindVertexArray(emptyVao);
+    gl.useProgram(fadeP.p); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    if (dotCount) {
+      const cover = coverOf(sc), coverA = coverOf(SCENES[sceneA]);
+      gl.useProgram(dotP.p);
+      gl.bindVertexArray(dotVao);
+      const u = dotP.u;
+      gl.uniform1f(u.uAspect, aspect);
+      gl.uniform2f(u.uCover, cover[0], cover[1]);
+      gl.uniform2f(u.uCoverA, coverA[0], coverA[1]);
+      gl.uniform1f(u.uMix, sceneMix());
+      gl.uniform2f(u.uOrigin, hitAt[0], hitAt[1]);
+      gl.uniform1f(u.uFocus, S.focus);
+      gl.uniform1f(u.uTime, clock);
+      gl.uniform1f(u.uFrame, frameNo);
+      gl.uniform2f(u.uPx, 1 / W, 1 / H);
+      gl.uniform1f(u.uShatter, S.shatter);
+      gl.uniform1f(u.uShimmer, S.shimmer);
+      gl.uniform1f(u.uReach, S.reach);
+      gl.uniform1f(u.uStirAmt, S.stir);
+      stir.forEach((s, k) => { stirBuf.set([s.x, s.y, s.vx, s.vy], k * 4); stirAge[k] = clock - s.t; });
+      gl.uniform1i(u.uStirN, stir.length);
+      if (stir.length) { gl.uniform4fv(u.uStir, stirBuf); gl.uniform1fv(u.uStirAge, stirAge); }
+      const px = S.size * dpr;
+      gl.uniform1f(u.uSize, px);
+      // keep the picture's overall brightness the same whatever the dot count or size
+      gl.uniform1f(u.uWeight, Math.min(2, (W * H) * cover[0] * cover[1] / dotCount / (px * px * 0.45) * 0.55) * (1 - keep));
+      gl.drawArrays(gl.POINTS, 0, dotCount);
+    }
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(emptyVao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(showP.p);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, acc.tex); gl.uniform1i(showP.u.uAcc, 0);
+    gl.uniform1f(showP.u.uBright, S.brightness);
+    gl.uniform1f(showP.u.uTint, S.tint);
+    gl.uniform1i(showP.u.uInk, S.ink ? 1 : 0);
+    gl.uniform3f(showP.u.uPaper, 0.965, 0.953, 0.933);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // =====================================================================
+  // PANEL
+  // =====================================================================
+  const fmt = {
+    dots: (v) => (DOT_COUNTS[v] >= 1e6 ? DOT_COUNTS[v] / 1e6 + 'M' : DOT_COUNTS[v] / 1e3 + 'K'),
+    contrast: (v) => (+v).toFixed(1), fill: (v) => (+v).toFixed(3), size: (v) => (+v).toFixed(1) + 'px', morph: (v) => (+v).toFixed(1), reach: (v) => (+v).toFixed(2),
+  };
+  const sliders = ['dots', 'contrast', 'fill', 'size', 'brightness', 'tint', 'trail', 'stir', 'reach', 'shatter', 'morph', 'shimmer', 'focus'];
+  const resample = ['contrast', 'fill'];
+  const press = (id, on) => document.getElementById(id).setAttribute('aria-pressed', String(on));
+  function sync() {
+    for (const id of sliders) {
+      document.getElementById(id).value = S[id];
+      document.querySelector(`output[for="${id}"]`).textContent = (fmt[id] || ((v) => (+v).toFixed(2)))(S[id]);
+    }
+    press('inkOff', !S.ink); press('inkOn', S.ink); press('fitFill', S.fit === 'fill'); press('fitWhole', S.fit === 'whole');
+    document.documentElement.dataset.paper = String(S.ink);
+    document.querySelectorAll('.scenes button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.scene === shownScene())));
+  }
+  let stepsTimer = 0;
+  const resampleSoon = () => { built = -1; clearTimeout(stepsTimer); stepsTimer = setTimeout(drawSteps, 60); };
+  for (const id of sliders) document.getElementById(id).addEventListener('input', (e) => {
+    S[id] = +e.target.value; sync();
+    if (resample.includes(id)) resampleSoon(); else if (id === 'dots') drawSteps();
+  });
+  const setInk = (on) => { if (S.ink === on) return; S.ink = on; sync(); resampleSoon(); };
+  document.getElementById('inkOff').addEventListener('click', () => setInk(false));
+  document.getElementById('inkOn').addEventListener('click', () => setInk(true));
+  document.getElementById('fitFill').addEventListener('click', () => { S.fit = 'fill'; sync(); });
+  document.getElementById('fitWhole').addEventListener('click', () => { S.fit = 'whole'; sync(); });
+  document.querySelectorAll('.scenes button').forEach((b) => b.addEventListener('click', () => goTo(+b.dataset.scene)));
+  document.getElementById('next').addEventListener('click', () => goTo(nextScene()));
+  document.getElementById('file').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f || !f.type.startsWith('image/')) return;
+    const prev = SCENES[3] && SCENES[3].src; if (prev) URL.revokeObjectURL(prev);
+    const sc = loadScene(3, URL.createObjectURL(f));
+    const own = document.querySelector('.scenes button[data-scene="3"]'); own.hidden = false;
+    const wait = setInterval(() => { if (sc.px) { clearInterval(wait); sceneB = sceneA = shownScene(); mixStart = -99; goTo(3); } }, 50);
+  });
+  document.getElementById('reset').addEventListener('click', () => { const ink = S.ink; Object.assign(S, DEFAULTS); sync(); if (ink !== S.ink) resampleSoon(); else { built = -1; drawSteps(); } });
+  document.getElementById('copy').addEventListener('click', async () => {
+    const line = 'Particle Painting settings: ' + JSON.stringify(S);
+    const out = document.getElementById('copied'), ta = document.getElementById('settings');
+    try { await navigator.clipboard.writeText(line); out.textContent = 'Copied — paste it to the secretary'; ta.hidden = true; }
+    catch { ta.value = line; ta.hidden = false; ta.select(); out.textContent = 'Copy this line:'; }
+  });
+  const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
+  tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
+  sync();
+  window.particles = { S, goTo, get stir() { return stir; }, get dotCount() { return dotCount; } };
+})();
+</script>
+<script type="module" src="/assets/js/exp-notes.js"></script>
+</body>
+</html>

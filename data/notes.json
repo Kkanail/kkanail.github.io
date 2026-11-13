@@ -1,5 +1,26 @@
 [
   {
+    "date": "2026-11-13",
+    "type": "note",
+    "title": "一隻用點畫出來的鯨魚",
+    "excerpt": "Particle Whale 是怎麼做出來的：寫給沒寫過程式的人，七個可以直接玩的小步驟，從一圈一圈的切片，到一隻會游泳、會張嘴的鯨魚。",
+    "tags": [
+      "WebGL",
+      "Interaction",
+      "Process"
+    ],
+    "link": "/notes/2026-11-13-particle-whale/"
+  },
+  {
+    "date": "2026-11-13",
+    "type": "update",
+    "title": "Added experiment: Particle Whale",
+    "link": "/playground/particle-whale/",
+    "tags": [
+      "AI"
+    ]
+  },
+  {
     "date": "2026-11-10",
     "type": "note",
     "title": "就是想做做看 Pinterest 上被洗到的潮東西！",

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Particle Whale — Playground — Kailan Huang</title>
-<meta name="description" content="A white whale made of dots: a 3D sperm whale whose skin is scattered into points of light. Turn it, scatter it, watch it swim.">
+<meta name="description" content="A whale made of dots: a 3D blue whale or sperm whale whose skin, and skeleton, are scattered into points of light. Turn it, X-ray it, watch it swim.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Newsreader:opsz@6..72&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -66,7 +66,7 @@
 </style>
 </head>
 <body>
-<canvas id="stage" aria-label="A 3D white whale drawn with glowing dots. Drag to turn it, tap it to send a ripple over its skin, tap the water to scatter the dots, scroll or pinch to come closer."></canvas>
+<canvas id="stage" aria-label="A 3D whale drawn with glowing dots. Drag to turn it, tap it to send a ripple over its skin, tap the water to scatter the dots, scroll or pinch to come closer."></canvas>
 <div class="bar top">
   <nav class="crumbs" aria-label="Breadcrumb">
     <a class="crumb-home" href="/">Kailan Huang</a><span class="crumb-sep">/</span>
@@ -80,6 +80,14 @@
   <button class="toggle-panel" id="togglePanel" type="button" aria-expanded="false" aria-controls="panel">⌃ Settings</button>
   <section>
     <h3>Whale</h3>
+    <div class="modes" role="group" aria-label="Which whale">
+      <button type="button" id="spBlue" aria-pressed="true">Blue whale</button>
+      <button type="button" id="spSperm" aria-pressed="false">Sperm whale</button>
+    </div>
+    <div class="modes" role="group" aria-label="Skin or skeleton">
+      <button type="button" id="xrayOff" aria-pressed="true">Skin</button>
+      <button type="button" id="xrayOn" aria-pressed="false">X-ray</button>
+    </div>
     <div class="modes" role="group" aria-label="Light or ink">
       <button type="button" id="inkOff" aria-pressed="true">Light on black</button>
       <button type="button" id="inkOn" aria-pressed="false">Ink on paper</button>
@@ -88,11 +96,11 @@
       <button type="button" id="viewSide">Side</button>
       <button type="button" id="viewFront">Head-on</button>
     </div>
-    <p class="hint-text">A sperm whale, built from shapes and then dusted with dots. Ink on paper turns the shading around: dots gather in the shadows and along the outline, like an engraving.</p>
+    <p class="hint-text">Two whales, built from shapes and then dusted with dots. The blue whale’s mouth runs back along the side of its head; when it opens you see the baleen hanging from the upper jaw and the pleated throat below. The sperm whale is Moby Dick: a boxy head and a narrow toothed jaw. X-ray turns the skin to glass and shows the skeleton: skull, mandibles, about 56 vertebrae, ribs, and the arm and finger bones inside each flipper. Ink on paper turns the shading around: dots gather in the shadows and along the outline, like an engraving.</p>
   </section>
   <section>
     <h3>How it’s built</h3>
-    <p class="hint-text">1 · <em>Shape:</em> the body is a row of rounded cross-sections from snout to tail (boxy at the head, round in the middle, flat-sided at the tail), joined into a skin of triangles. Jaw, teeth, flippers and flukes are made the same way. 2 · <em>Skin:</em> each triangle gets a tone: wrinkles on the forehead and flanks, a few old scars, the eye. 3 · <em>Dots:</em> a triangle’s chance of getting a dot is its area × its tone — the same running-total trick as the painting, on a surface instead of a picture. 4 · <em>Light:</em> every frame, each dot asks how much it faces the light and the camera.</p>
+    <p class="hint-text">1 · <em>Shape:</em> the body is a row of rounded cross-sections from snout to tail (boxy at the head, round in the middle, flat-sided at the tail), joined into a skin of triangles. Jaw, flippers, flukes, baleen and every bone are made the same way. 2 · <em>Skin:</em> each triangle gets a tone: wrinkles on the forehead and flanks, a few old scars, the eye. 3 · <em>Dots:</em> a triangle’s chance of getting a dot is its area × its tone — the same running-total trick as the painting, on a surface instead of a picture. 4 · <em>Light:</em> every frame, each dot asks how much it faces the light and the camera.</p>
     <p class="math" id="math"></p>
   </section>
   <section>
@@ -151,7 +159,7 @@
   const touch = matchMedia('(pointer: coarse)').matches;
   const DOT_COUNTS = [50000, 100000, 200000, 400000, 800000];
   const DEFAULTS = {
-    ink: false,
+    species: 'blue', xray: false, ink: false,
     dots: touch ? 1 : 2, size: 1.8, brightness: 1, tint: 0.7, trail: 0.3,
     rim: 0.8, solid: 1, skin: 0.7,
     blur: 0.35, focus: 0, spin: reduceMotion ? 0 : 0.25,
@@ -166,54 +174,89 @@
   if (!gl.getExtension('EXT_color_buffer_float') && !gl.getExtension('EXT_color_buffer_half_float')) return fail('This browser can’t render float textures, which this experiment needs.');
 
   // =====================================================================
-  // THE WHALE — a few lofted shapes (rows of rounded cross-sections) turned into triangles
+  // THE WHALES — lofted shapes (rows of rounded cross-sections) turned into triangles
   // =====================================================================
   // seeded random, so the scars land in the same place every visit
   let seed = 1851;                                         // the year Moby-Dick came out
   const rand = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const clamp01 = (v) => Math.min(1, Math.max(0, v));
   const smooth = (a, b, v) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const spow = (v, e) => Math.sign(v) * Math.pow(Math.abs(v), e);
 
-  // body profile along s (0 = snout, 1 = tail), length 2 units: x = 1 − 2s.
+  // Two whales. Body profile along s (0 = snout, 1 = tail), length 2 units: x = 1 − 2s.
   // T = top above the spine, B = belly below, W = half width, n = squareness of the section, yc = spine height
-  const KEYS = {
-    s:  [0,    0.08,  0.2,   0.3,   0.42,  0.55,  0.65,  0.75,  0.85,  0.93,  1],
-    T:  [0.2,  0.215, 0.22,  0.215, 0.205, 0.185, 0.15,  0.11,  0.072, 0.048, 0.034],
-    B:  [0.16, 0.17,  0.18,  0.195, 0.205, 0.185, 0.135, 0.095, 0.068, 0.048, 0.034],
-    W:  [0.13, 0.148, 0.158, 0.168, 0.172, 0.155, 0.112, 0.074, 0.046, 0.031, 0.022],
-    n:  [3.8,  3.5,   3.1,   2.6,   2.3,   2.2,   2.1,   2.05,  2,     2,     2],
-    yc: [0,    0,     0,     -0.01, -0.02, -0.02, -0.01,  0,     0.008, 0.012, 0.012],
+  const SPECIES = {
+    // the blue whale: long and streamlined, a flat U-shaped head, the mouth running back along the side to below the eye
+    blue: {
+      keys: {
+        s:  [0,      0.03,  0.08,  0.15,  0.23,  0.32,  0.42,  0.52,  0.62,   0.72,  0.82,  0.9,   0.95,  1],
+        T:  [0.018,  0.04,  0.058, 0.078, 0.098, 0.116, 0.126, 0.124, 0.11,   0.086, 0.06,  0.041, 0.031, 0.023],
+        B:  [0.022,  0.05,  0.075, 0.1,   0.122, 0.14,  0.15,  0.145, 0.125,  0.095, 0.066, 0.044, 0.032, 0.023],
+        W:  [0.03,   0.062, 0.09,  0.11,  0.123, 0.13,  0.133, 0.128, 0.112,  0.085, 0.055, 0.034, 0.024, 0.017],
+        n:  [2.3,    2.4,   2.4,   2.3,   2.2,   2.1,   2.05,  2,     2,      2,     2,     2,     2,     2],
+        yc: [-0.004, 0,     0.006, 0.01,  0.01,  0.005, 0,     -0.004, -0.004, 0,     0.005, 0.008, 0.01,  0.01],
+      },
+      cap: [0.012, 0.02],
+      bump: (s) => 0.012 * Math.exp(-(((s - 0.165) / 0.014) ** 2)),   // the splash guard in front of the blowholes
+      corner: 0.235, mouth: 0.15,              // corner of the mouth (the jaw's hinge) along s; the mouth line sits this far (radians) below the widest point of the side
+      flipper: { s: 0.27, down: 0.5, len: 0.27, width: 0.032, dir: [-0.62, -0.5, 0.6] },
+      fluke: { span: 0.27, chord: 0.11 },
+      dorsal: 0.735,
+    },
+    // the sperm whale (Moby Dick): a huge boxy head, a narrow rod of a lower jaw, a hump and knuckles instead of a fin
+    sperm: {
+      keys: {
+        s:  [0,    0.08,  0.2,   0.3,   0.42,  0.55,  0.65,  0.75,  0.85,  0.93,  1],
+        T:  [0.2,  0.215, 0.22,  0.215, 0.205, 0.185, 0.15,  0.11,  0.072, 0.048, 0.034],
+        B:  [0.16, 0.17,  0.18,  0.195, 0.205, 0.185, 0.135, 0.095, 0.068, 0.048, 0.034],
+        W:  [0.13, 0.148, 0.158, 0.168, 0.172, 0.155, 0.112, 0.074, 0.046, 0.031, 0.022],
+        n:  [3.8,  3.5,   3.1,   2.6,   2.3,   2.2,   2.1,   2.05,  2,     2,     2],
+        yc: [0,    0,     0,     -0.01, -0.02, -0.02, -0.01,  0,     0.008, 0.012, 0.012],
+      },
+      cap: [0.04, 0.02],
+      // the "high, pyramidical white hump" and the knuckles behind it
+      bump: (s) => 0.05 * Math.exp(-Math.abs(s - 0.62) / 0.022) + [0.69, 0.735, 0.78, 0.82].reduce((a, k) => a + 0.012 * Math.exp(-(((s - k) / 0.012) ** 2)), 0),
+      corner: 0.32,
+      flipper: { s: 0.31, down: 0.55, len: 0.24, width: 0.05, dir: [-0.55, -0.55, 0.62] },
+      fluke: { span: 0.37, chord: 0.15 },
+    },
   };
+  let species = 'blue', SP = SPECIES.blue;
   function key(name, s) {
-    const K = KEYS.s, V = KEYS[name];
+    const K = SP.keys.s, V = SP.keys[name];
     let i = 0; while (i < K.length - 2 && s > K[i + 1]) i++;
     const t = clamp01((s - K[i]) / (K[i + 1] - K[i]));
     const p0 = V[Math.max(0, i - 1)], p1 = V[i], p2 = V[i + 1], p3 = V[Math.min(V.length - 1, i + 2)];
     const t2 = t * t, t3 = t2 * t;                          // Catmull-Rom through the keys
     return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
   }
-  // round off both ends so the body closes: a quarter circle at the blunt snout, a short one at the tail
-  const capOf = (s) => { const a = 1 - clamp01(s / 0.04), b = 1 - clamp01((1 - s) / 0.02); return Math.sqrt(1 - a * a) * Math.sqrt(1 - b * b); };
-  // the "high, pyramidical white hump" and the knuckles behind it: only on the top of the back
-  const hump = (s) => 0.05 * Math.exp(-Math.abs(s - 0.62) / 0.022) + [0.69, 0.735, 0.78, 0.82].reduce((a, k) => a + 0.012 * Math.exp(-(((s - k) / 0.012) ** 2)), 0);
+  // round off both ends so the body closes
+  const capOf = (s) => { const a = 1 - clamp01(s / SP.cap[0]), b = 1 - clamp01((1 - s) / SP.cap[1]); return Math.sqrt(1 - a * a) * Math.sqrt(1 - b * b); };
   const profile = (s) => { const c = capOf(s); return { T: key('T', s) * c, B: key('B', s) * c, W: key('W', s) * c, n: key('n', s), yc: key('yc', s) }; };
-  const spow = (v, e) => Math.sign(v) * Math.pow(Math.abs(v), e);
+  // the point of the section at s at angle th (0 = right side, π/2 = top), k = how far out (1 = on the skin)
+  const sectionAt = (s, th, k = 1) => {
+    const P = profile(s), c = Math.cos(th), sn = Math.sin(th);
+    return [1 - 2 * s, P.yc + spow(sn, 2 / P.n) * (sn > 0 ? P.T : P.B) * k, spow(c, 2 / P.n) * P.W * k];
+  };
 
-  // a part = grid of stations (u) × points around each section (v), closed around v
-  function bodyPart() {
-    const U = 280, V = 96, pos = [], cen = [], uv = [], jw = [];
+  // a body piece: rows of sections from snout to tail, the whole way round or over an arc of the section
+  function bodyArc(name, th0, th1, V, jwOf) {
+    const U = 280, closed = th1 - th0 > Math.PI * 2 - 1e-6, VV = closed ? V : V + 1;
+    const pos = [], cen = [], uv = [], jw = [];
     for (let i = 0; i <= U; i++) {
       const s = 0.5 - 0.5 * Math.cos(Math.PI * i / U), P = profile(s), x = 1 - 2 * s;   // more rings near the snout and tail
-      for (let j = 0; j < V; j++) {
-        const th = (j / V) * Math.PI * 2, c = Math.cos(th), sn = Math.sin(th);
-        const top = sn > 0 ? P.T + hump(s) * Math.pow(sn, 6) * capOf(s) : P.B;
+      for (let j = 0; j < VV; j++) {
+        const th = th0 + (th1 - th0) * j / V, c = Math.cos(th), sn = Math.sin(th);
+        const top = sn > 0 ? P.T + SP.bump(s) * Math.pow(sn, 6) * capOf(s) : P.B;
         pos.push(x, P.yc + spow(sn, 2 / P.n) * top, spow(c, 2 / P.n) * P.W);
-        cen.push(x, P.yc, 0); uv.push(s, th);
-        jw.push(0.9 * smooth(0.45, 0.9, -sn) * smooth(0.25, 0.31, s) * (1 - smooth(0.33, 0.38, s)));   // corner of the mouth
+        cen.push(x, P.yc, 0); uv.push(s, th); jw.push(jwOf ? jwOf(s, th) : 0);
       }
     }
-    return { name: 'body', U, V, pos, cen, uv, jw };
+    return { name, U, V: VV, wrap: closed, pos, cen, uv, jw };
   }
+  // a part = grid of stations (u) × points around each section (v), closed around v
   function loftPart(name, U, V, station) {                 // station(u) → { c, a, b, ra, rb }
     const pos = [], cen = [], uv = [];
     for (let i = 0; i <= U; i++) {
@@ -224,151 +267,285 @@
         cen.push(...st.c); uv.push(i / U, th);
       }
     }
-    return { name, U, V, pos, cen, uv };
+    return { name, U, V, wrap: true, pos, cen, uv };
   }
-  const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
-  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  // the narrow lower jaw, tucked under the head
+  // a round tube along a path (ribs, finger bones, the mandibles)
+  function tube(name, U, V, path, radius) {
+    return loftPart(name, U, V, (u) => {
+      const c = path(u), t = norm(path(Math.min(1, u + 0.01)).map((v, k) => v - path(Math.max(0, u - 0.01))[k]));
+      let a = cross(t, [0, 1, 0]); if (Math.hypot(...a) < 0.2) a = cross(t, [1, 0, 0]);
+      a = norm(a); const r = radius(u);
+      return { c, a, b: cross(t, a), ra: r, rb: r };
+    });
+  }
+  const line = (p, q) => (u) => p.map((v, k) => v + (q[k] - v) * u);
+
+  // flippers: paddles low on the sides; their bones are laid out along the same axes
+  function flipperOf(side) {
+    const F = SP.flipper, P = profile(F.s), root = [1 - 2 * F.s, P.yc - P.B * F.down, side * P.W * 0.72];
+    const d = norm([F.dir[0], F.dir[1], side * F.dir[2]]), w = norm(cross(d, [0, 1, 0])), t = cross(w, d);
+    const skin = loftPart('flipper', 26, 24, (u) => {
+      const l = u * F.len, f = Math.pow(Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.85)), 0.6);
+      return { c: root.map((r, k) => r + d[k] * l), a: w, b: t, ra: F.width * f * (1 - 0.3 * u), rb: F.width * 0.22 * f };
+    });
+    return { skin, root, d, w, side, len: F.len, width: F.width };
+  }
+  // the flukes: two swept wings with a notch between them
+  function fluke(side) {
+    const x0 = -0.92, y0 = key('yc', 0.96), F = SP.fluke, k = F.chord / 0.15;
+    return loftPart('fluke', 48, 32, (u) => {
+      const le = x0 + 0.02 - F.span * 0.46 * Math.pow(u, 1.7);
+      const chord = F.chord * Math.pow(1 - u, 0.6) * (1 - 0.3 * u) * (1 - 0.35 * Math.exp(-u * 12)) + 0.002;
+      return { c: [le - chord / 2, y0 + 0.025 * u * u, side * F.span * u], a: [1, 0, 0], b: [0, 1, 0], ra: chord / 2, rb: 0.02 * k * Math.pow(1 - u, 0.8) + 0.002 };
+    });
+  }
+
+  // --- the blue whale's mouth: the lower half of the head is the jaw ---
+  function blueParts(jwOf) {
+    const a = SP.mouth, sC = SP.corner, parts = [];
+    parts.push(bodyArc('body', -a, Math.PI + a, 88, null));
+    parts.push(bodyArc('belly', Math.PI + a, Math.PI * 2 - a, 72, (s) => jwOf(s)));
+    // inside the mouth: the roof (palate) arching up into the head, the floor (tongue) dipping into the jaw
+    const sheet = (name, sign) => {
+      const U = 60, V = 24, pos = [], cen = [], uv = [], jw = [];
+      for (let i = 0; i <= U; i++) {
+        const s = 0.012 + (sC + 0.004 - 0.012) * i / U, e = sectionAt(s, -a), P = profile(s);
+        for (let j = 0; j <= V; j++) {
+          const t = (j / V) * 2 - 1, y = e[1] + sign * (1 - t * t) * (sign > 0 ? P.T * 0.45 : P.B * 0.5);
+          pos.push(e[0], y, t * e[2] * 0.995); cen.push(e[0], e[1] + sign * 2, 0); uv.push(s, t); jw.push(sign < 0 ? jwOf(s) : 0);
+        }
+      }
+      return { name, U, V: V + 1, wrap: false, pos, cen, uv, jw, inner: true };
+    };
+    parts.push(sheet('palate', 1), sheet('tongue', -1));
+    // baleen: a fringe of plates hanging from both edges of the upper jaw, hidden inside the lower jaw when the mouth is shut
+    for (const side of [1, -1]) {
+      const p = loftPart('baleen', 60, 8, (u) => {
+        const s = 0.03 + (sC - 0.04) * u, e = sectionAt(s, side > 0 ? -a : Math.PI + a);
+        const h = 0.04 * Math.pow(Math.sin(Math.PI * (0.08 + 0.84 * u)), 0.7) + 0.004;
+        return { c: [e[0], e[1] - h / 2 + 0.002, e[2] * 0.9], a: [0, 1, 0], b: [0, 0, 1], ra: h / 2, rb: 0.004 };
+      });
+      p.inner = true; parts.push(p);
+    }
+    // a small, swept-back dorsal fin far down the back
+    const s0 = SP.dorsal, P = profile(s0), base = [1 - 2 * s0, P.yc + P.T * 0.85, 0];
+    parts.push(loftPart('fin', 16, 16, (u) => ({ c: [base[0] - 0.02 - 0.05 * Math.pow(u, 1.4), base[1] + 0.045 * u, 0], a: [1, 0, 0], b: [0, 0, 1], ra: 0.05 * Math.pow(1 - u, 0.9) + 0.002, rb: 0.007 * (1 - u) + 0.001 })));
+    return parts;
+  }
+
+  // --- the sperm whale's mouth: a narrow lower jaw with teeth, tucked under the head ---
   const jawAt = (s) => { const P = profile(s), u = (s - 0.065) / 0.27, f = Math.sqrt(Math.sin(Math.PI * Math.min(1, u * 1.6 + 0.0001) / 2)) * (1 - smooth(0.75, 1, u));
     const g = f * (0.7 + 0.45 * Math.min(1, u)) * (1 - smooth(0.85, 1.02, u) * 0.85);   // narrow at the tip, deeper toward the throat
     return { c: [1 - 2 * s, P.yc - P.B * 0.88 - 0.014, 0], ra: 0.05 * g, rb: 0.036 * g }; };
-  const jaw = loftPart('jaw', 60, 32, (u) => ({ ...jawAt(0.065 + u * 0.27), a: [0, 0, 1], b: [0, 1, 0] }));
-  jaw.jaw = 1;
-  // it opens on a hinge at the back of the jaw, under the eye
-  const HINGE = jawAt(0.32).c;
-  // sperm whales only have teeth in the lower jaw: two rows of blunt cones, hidden in sockets of the upper jaw when the mouth is shut
-  const TEETH = [];
-  for (let i = 0; i < 18; i++) for (const side of [1, -1]) {
-    const s = 0.085 + i * 0.0095, J = jawAt(s), base = [J.c[0], J.c[1] + J.rb * 0.75, side * J.ra * 0.55];
-    const h = 0.02 - i * 0.0003, r = 0.0055;
-    const tooth = loftPart('tooth', 4, 8, (u) => ({ c: [base[0], base[1] + h * u, base[2]], a: [1, 0, 0], b: [0, 0, 1], ra: r * Math.sqrt(1 - u) + 0.0004, rb: r * Math.sqrt(1 - u) + 0.0004 }));
-    tooth.jaw = 1; TEETH.push(tooth);
+  function spermParts() {
+    // the skin at the corner of the mouth stretches with the jaw
+    const parts = [bodyArc('body', 0, Math.PI * 2, 96, (s, th) => 0.9 * smooth(0.45, 0.9, -Math.sin(th)) * smooth(0.25, 0.31, s) * (1 - smooth(0.33, 0.38, s)))];
+    const jaw = loftPart('jaw', 60, 32, (u) => ({ ...jawAt(0.065 + u * 0.27), a: [0, 0, 1], b: [0, 1, 0] }));
+    jaw.jaw = 1; parts.push(jaw);
+    // only the lower jaw has teeth: two rows of blunt cones, hidden in sockets of the upper jaw when the mouth is shut
+    for (let i = 0; i < 18; i++) for (const side of [1, -1]) {
+      const s = 0.085 + i * 0.0095, J = jawAt(s), base = [J.c[0], J.c[1] + J.rb * 0.75, side * J.ra * 0.55];
+      const h = 0.02 - i * 0.0003, r = 0.0055;
+      const tooth = loftPart('tooth', 4, 8, (u) => ({ c: [base[0], base[1] + h * u, base[2]], a: [1, 0, 0], b: [0, 0, 1], ra: r * Math.sqrt(1 - u) + 0.0004, rb: r * Math.sqrt(1 - u) + 0.0004 }));
+      tooth.jaw = 1; parts.push(tooth);
+    }
+    return parts;
   }
-  // two small paddle flippers, low on the sides behind the eye
-  const flipper = (side) => {
-    const P = profile(0.31), root = [1 - 2 * 0.31, P.yc - P.B * 0.55, side * P.W * 0.72];
-    const d = norm([-0.55, -0.55, side * 0.62]), w = norm(cross(d, [0, 1, 0])), t = cross(w, d);
-    return loftPart('flipper', 26, 24, (u) => {
-      const l = u * 0.24, f = Math.pow(Math.sin(Math.PI * Math.min(1, 0.15 + u * 0.85)), 0.6);
-      return { c: root.map((r, k) => r + d[k] * l), a: w, b: t, ra: 0.05 * f * (1 - 0.3 * u), rb: 0.011 * f };
-    });
-  };
-  // the flukes: two swept wings with a notch between them
-  const fluke = (side) => {
-    const x0 = -0.92, y0 = key('yc', 0.96);
-    return loftPart('fluke', 48, 32, (u) => {
-      const le = x0 + 0.02 - 0.17 * Math.pow(u, 1.7);
-      const chord = 0.15 * Math.pow(1 - u, 0.6) * (1 - 0.3 * u) * (1 - 0.35 * Math.exp(-u * 12)) + 0.002;
-      return { c: [le - chord / 2, y0 + 0.025 * u * u, side * 0.37 * u], a: [1, 0, 0], b: [0, 1, 0], ra: chord / 2, rb: 0.02 * Math.pow(1 - u, 0.8) + 0.002 };
-    });
-  };
-  const PARTS = [bodyPart(), jaw, ...TEETH, flipper(1), flipper(-1), fluke(1), fluke(-1)];
 
-  // is a point inside the body? (bits of jaw, flipper and fluke hidden inside it get no dots)
+  // --- the skeleton: skull, mandibles, a spine of ~56 vertebrae, ribs, the flipper's arm and finger bones ---
+  function skeleton(flips, jwOf) {
+    const out = [], sC = SP.corner, blue = species === 'blue';
+    const add = (p, jw) => { p.bone = true; if (jw) p.jw = Float32Array.from({ length: p.pos.length / 3 }, (_, k) => jw(p.uv[k * 2])); out.push(p); };
+    const spineY = (s) => { const P = profile(s); return P.yc + 0.35 * P.T; };
+    const s0 = sC + 0.012, s1 = 0.975, NV = 56, ds = (s1 - s0) / (NV - 1);
+    for (let i = 0; i < NV; i++) {
+      const s = s0 + ds * i, P = profile(s), x = 1 - 2 * s, y = spineY(s);
+      const rc = Math.max(0.0045, 0.26 * Math.min(P.T, P.W)), len = 2 * ds * 0.72;
+      add(loftPart('bone', 3, 10, (u) => ({ c: [x + len * (0.5 - u), y, 0], a: [0, 1, 0], b: [0, 0, 1], ra: rc, rb: rc })));          // the centrum
+      const hs = P.T * 0.5 * smooth(s0 - 0.01, s0 + 0.06, s) * (1 - smooth(0.68, 0.86, s));                                             // spine pointing up and back
+      if (hs > 0.004) add(loftPart('bone', 3, 6, (u) => ({ c: [x - 0.35 * hs * u, y + rc * 0.8 + hs * u, 0], a: [1, 0, 0], b: [0, 0, 1], ra: len * 0.32 * (1 - 0.45 * u), rb: 0.0022 })));
+      const lt = P.W * 0.45 * smooth(s0 + 0.1, s0 + 0.16, s) * (1 - smooth(0.66, 0.8, s));                                              // wings to the sides
+      if (lt > 0.004) for (const side of [1, -1]) add(loftPart('bone', 3, 6, (u) => ({ c: [x, y - rc * 0.2, side * (rc * 0.8 + lt * u)], a: [1, 0, 0], b: [0, 1, 0], ra: len * 0.28 * (1 - 0.4 * u), rb: 0.0022 })));
+      const hc = P.B * 0.32 * smooth(0.6, 0.66, s) * (1 - smooth(0.88, 0.95, s));                                                       // chevrons under the tail
+      if (hc > 0.004) add(loftPart('bone', 3, 6, (u) => ({ c: [x - 0.2 * hc * u, y - rc * 0.8 - hc * u, 0], a: [1, 0, 0], b: [0, 0, 1], ra: len * 0.25 * (1 - 0.4 * u), rb: 0.002 })));
+    }
+    // ribs: long arcs curving down around the chest, longest in the middle
+    const NR = blue ? 15 : 11;
+    for (let i = 0; i < NR; i++) {
+      const s = s0 + ds * (i + 0.5), reach = 0.45 + 0.5 * Math.sin(Math.PI * (i + 1) / (NR + 1));
+      for (const side of [1, -1]) add(tube('bone', 18, 6, (t) => { const q = sectionAt(s + t * 0.03, 0.8 - t * (0.9 + 1.5 * reach), 0.84); return [q[0], q[1], side * q[2]]; }, (t) => 0.0055 * (1 - 0.4 * t)));
+    }
+    if (blue) {
+      // the skull: a long flat rostrum widening into the braincase behind the eye
+      add(loftPart('bone', 40, 16, (u) => {
+        const s = 0.015 + (s0 + 0.01 - 0.015) * u, e = sectionAt(s, -SP.mouth), brain = smooth(0.6, 0.95, u);
+        return { c: [1 - 2 * s, e[1] + 0.012 + 0.04 * brain, 0], a: [0, 0, 1], b: [0, 1, 0], ra: e[2] * (0.82 - 0.25 * brain) * smooth(0, 0.06, u) + 0.002, rb: (0.012 + 0.05 * brain) * smooth(0, 0.1, u) + 0.002 };
+      }));
+      // the mandibles: two long bowed bones along the edges of the lower jaw, the largest single bones of any animal
+      for (const side of [1, -1]) add(tube('bone', 40, 8, (t) => sectionAt(0.018 + (sC + 0.004 - 0.018) * t, side > 0 ? -SP.mouth - 0.28 : Math.PI + SP.mouth + 0.28, 0.86),
+        (t) => 0.004 + 0.009 * Math.sin(Math.PI * Math.min(1, 0.15 + t * 0.85))), (u) => jwOf(0.018 + (sC + 0.004 - 0.018) * u));
+    } else {
+      // the skull sits low at the back of the head; the great forehead above it is the spermaceti organ, not bone
+      add(loftPart('bone', 40, 16, (u) => {
+        const s = 0.07 + (s0 + 0.01 - 0.07) * u, P = profile(s), brain = smooth(0.55, 0.95, u);
+        return { c: [1 - 2 * s, P.yc - P.B * (0.62 - 0.45 * brain), 0], a: [0, 0, 1], b: [0, 1, 0], ra: P.W * (0.25 + 0.45 * brain) * smooth(0, 0.08, u) + 0.002, rb: (0.012 + 0.07 * brain) * smooth(0, 0.1, u) + 0.002 };
+      }));
+      for (const side of [1, -1]) add(tube('bone', 40, 8, (t) => { const J = jawAt(0.07 + 0.25 * t); return [J.c[0], J.c[1], side * J.ra * 0.45]; }, (t) => 0.003 + 0.007 * t), () => 1);
+    }
+    // the flipper's bones: shoulder blade, upper arm, forearm, four fingers
+    for (const f of flips) {
+      const at = (l, across) => f.root.map((r, k) => r + f.d[k] * l * f.len + f.w[k] * across * f.width);
+      add(loftPart('bone', 6, 8, (u) => ({ c: [f.root[0] + 0.01, f.root[1] + 0.07 * u, f.root[2] * 0.9], a: [1, 0, 0], b: [0, 0, 1], ra: 0.012 + 0.03 * u, rb: 0.002 })));
+      add(tube('bone', 6, 8, line(at(-0.02, 0), at(0.22, 0)), () => 0.008));
+      for (const k of [-0.35, 0.35]) add(tube('bone', 6, 6, line(at(0.22, k * 0.6), at(0.45, k)), () => 0.0045));
+      for (let k = 0; k < 4; k++) { const off = (k - 1.5) * 0.32; add(tube('bone', 10, 6, line(at(0.46, off), at(0.78 + 0.12 * Math.sin(Math.PI * (k + 0.5) / 4), off * 0.7)), (t) => 0.0035 * (1 - 0.5 * t))); }
+    }
+    // two small hip bones, all that is left of the hind legs
+    for (const side of [1, -1]) { const s = 0.6, P = profile(s); add(tube('bone', 4, 6, line([1 - 2 * s + 0.02, P.yc - P.B * 0.45, side * 0.02], [1 - 2 * s - 0.03, P.yc - P.B * 0.38, side * 0.03]), () => 0.004)); }
+    return out;
+  }
+
+  // is a point inside the body? (bits of fins hidden inside it get no dots)
   function insideBody(x, y, z) {
     const s = (1 - x) / 2; if (s <= 0 || s >= 1) return false;
     const P = profile(s), dy = y - P.yc, r = dy > 0 ? P.T : P.B;
     if (P.W < 1e-4 || r < 1e-4) return false;
     return Math.pow(Math.abs(z / P.W), P.n) + Math.pow(Math.abs(dy / r), P.n) < 0.97;
   }
-  // skin: forehead wrinkles, corrugated flanks, old scars, the eye. 1 = clean white skin.
-  const SCARS = Array.from({ length: 22 }, () => ({ s: 0.12 + rand() * 0.7, th: rand() * Math.PI * 2, a: rand() * Math.PI, len: 0.02 + rand() * 0.07 }));
-  const EYE = (() => { const s = 0.285, P = profile(s); return [1 - 2 * s, P.yc - P.B * 0.42, P.W * 0.93]; })();
+  // skin tone: 1 = clean skin; wrinkles, scars, pleats and plates take some away
+  let SCARS = [], EYE = [0, 0, 0];
   function toneOf(part, x, y, z, s, th) {
     let tone = 1;
-    if (part === 'body') {
-      // forehead: horizontal folds across the front and top of the head
-      const fh = (1 - smooth(0.18, 0.3, s)) * smooth(-0.1, 0.05, y - key('yc', s));
-      tone -= 0.32 * fh * Math.pow(0.5 + 0.5 * Math.sin(y * 95 + 3 * Math.sin(z * 14 + s * 9)), 6);
-      // flanks: the sperm whale's prune-like corrugated skin behind the head
-      const fl = smooth(0.3, 0.42, s) * (1 - smooth(0.82, 0.9, s));
-      tone -= fl * (0.22 * Math.pow(0.5 + 0.5 * Math.sin(s * 150 + 2.6 * Math.sin(th * 4 + s * 11)), 8)
-                  + 0.12 * Math.pow(0.5 + 0.5 * Math.sin(th * 46 + 2 * Math.sin(s * 34)), 10));
-      // scars: short scratched lines
-      for (const sc of SCARS) {
+    const skin = part === 'body' || part === 'belly';
+    if (skin) {
+      if (species === 'blue') {
+        // mottled skin: pale patches on a darker ground
+        const m = Math.sin(s * 53 + 2.2 * Math.sin(th * 5 + s * 7)) * Math.sin(th * 11 + s * 37) + 0.55 * Math.sin(s * 131 + th * 23 + 2 * Math.sin(s * 40));
+        tone -= 0.2 * smooth(0.25, 0.95, m) * smooth(0.12, 0.25, s);
+        // throat pleats: grooves from the chin back to the navel
+        tone -= 0.32 * (1 - smooth(0.42, 0.52, s)) * smooth(0.25, 0.6, -Math.sin(th)) * Math.pow(0.5 + 0.5 * Math.sin(th * 80 + s * 4), 6);
+      } else {
+        // forehead folds and the corrugated flanks
+        const fh = (1 - smooth(0.18, 0.3, s)) * smooth(-0.1, 0.05, y - key('yc', s));
+        tone -= 0.32 * fh * Math.pow(0.5 + 0.5 * Math.sin(y * 95 + 3 * Math.sin(z * 14 + s * 9)), 6);
+        const fl = smooth(0.3, 0.42, s) * (1 - smooth(0.82, 0.9, s));
+        tone -= fl * (0.22 * Math.pow(0.5 + 0.5 * Math.sin(s * 150 + 2.6 * Math.sin(th * 4 + s * 11)), 8)
+                    + 0.12 * Math.pow(0.5 + 0.5 * Math.sin(th * 46 + 2 * Math.sin(s * 34)), 10));
+      }
+      for (const sc of SCARS) {                            // old scars: short scratched lines
         let dth = th - sc.th; dth -= Math.round(dth / (Math.PI * 2)) * Math.PI * 2;
         const dx = (s - sc.s) * 2, dyv = dth * 0.17, ca = Math.cos(sc.a), sa = Math.sin(sc.a);
         const along = dx * ca + dyv * sa, across = -dx * sa + dyv * ca;
         if (Math.abs(along) < sc.len) tone *= 1 - 0.55 * Math.exp(-((across / 0.0045) ** 2)) * (1 - Math.pow(Math.abs(along) / sc.len, 4));
       }
-      // the small eye, near the corner of the mouth, on both sides
-      const de = Math.hypot(x - EYE[0], y - EYE[1], Math.abs(z) - EYE[2]);
+      const de = Math.hypot(x - EYE[0], y - EYE[1], Math.abs(z) - EYE[2]);   // the small eye, on both sides
       tone *= 1 - 0.9 * Math.exp(-((de / 0.011) ** 2));
       tone += 0.25 * Math.exp(-(((de - 0.022) / 0.006) ** 2));
-    } else if (part === 'jaw') tone = 1.05;
-    else tone = part === 'tooth' ? 1.15 : 0.95 - 0.1 * Math.pow(0.5 + 0.5 * Math.sin(s * 60), 8);
+    } else if (part === 'baleen') tone = 0.55 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(s * 1400), 4);   // the plates: a comb of fine lines
+    else if (part === 'palate' || part === 'tongue') tone = 0.8;
+    else if (part === 'jaw') tone = 1.05;
+    else if (part === 'tooth') tone = 1.15;
+    else if (part === 'bone') tone = 1;
+    else tone = 0.95 - 0.1 * Math.pow(0.5 + 0.5 * Math.sin(s * 60), 8);
     return Math.max(0.05, Math.min(1.3, tone));
   }
 
-  // every part → triangles with area, normal and tone; then one running total over all of them
-  const TRI = (() => {
-    const list = []; let vertsTotal = 0;
-    for (const part of PARTS) {
+  // parts → triangles with area, normal and tone (for throwing dots), and one hidden mesh (for the depth picture)
+  function triangles(parts) {
+    const list = [];
+    for (const part of parts) {
       const { U, V, pos, cen, uv } = part, n = (U + 1) * V;
-      vertsTotal += n;
       const nor = new Float32Array(n * 3), tone = new Float32Array(n);
       for (let k = 0; k < n; k++) tone[k] = toneOf(part.name, pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2], uv[k * 2], uv[k * 2 + 1]);
       const tris = [];
-      for (let i = 0; i < U; i++) for (let j = 0; j < V; j++) {
+      for (let i = 0; i < U; i++) for (let j = 0; j < (part.wrap ? V : V - 1); j++) {
         const a = i * V + j, b = i * V + ((j + 1) % V), c = (i + 1) * V + j, d = (i + 1) * V + ((j + 1) % V);
         tris.push([a, c, b], [b, c, d]);
       }
       const P = (k) => [pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]];
-      const keep = [];
+      const keep = [], cull = !part.jaw && !part.inner && !part.bone && part.name !== 'body' && part.name !== 'belly';
       for (const t of tris) {
         const A = P(t[0]), B = P(t[1]), C = P(t[2]);
         const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
         let nn = cross(e1, e2); const area2 = Math.hypot(...nn); if (area2 < 1e-12) continue;
         const mid = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, (A[2] + B[2] + C[2]) / 3];
-        const cc = [(cen[t[0] * 3] + cen[t[1] * 3] + cen[t[2] * 3]) / 3, (cen[t[0] * 3 + 1] + cen[t[1] * 3 + 1] + cen[t[2] * 3 + 1]) / 3, (cen[t[0] * 3 + 2] + cen[t[1] * 3 + 2] + cen[t[2] * 3 + 2]) / 3];
+        const cc = [0, 1, 2].map((q) => (cen[t[0] * 3 + q] + cen[t[1] * 3 + q] + cen[t[2] * 3 + q]) / 3);
         if ((mid[0] - cc[0]) * nn[0] + (mid[1] - cc[1]) * nn[1] + (mid[2] - cc[2]) * nn[2] < 0) { nn = nn.map((v) => -v); t.reverse(); }
         for (const k of t) { nor[k * 3] += nn[0]; nor[k * 3 + 1] += nn[1]; nor[k * 3 + 2] += nn[2]; }   // area-weighted vertex normals
-        if (!part.jaw && part.name !== 'body' && insideBody(...mid)) continue;
+        if (cull && insideBody(...mid)) continue;
         keep.push({ t, area: area2 / 2 });
       }
-      for (let k = 0; k < n; k++) { const v = norm([nor[k * 3], nor[k * 3 + 1], nor[k * 3 + 2]]); nor.set(v, k * 3); }
-      for (const { t, area } of keep) list.push({ part, t, area, nor, tone });
+      for (let k = 0; k < n; k++) nor.set(norm([nor[k * 3], nor[k * 3 + 1], nor[k * 3 + 2]]), k * 3);
       part.nor = nor; part.tris = tris;
       if (!part.jw) part.jw = new Float32Array(n).fill(part.jaw ? 1 : 0);
+      for (const { t, area } of keep) list.push({ part, t, area, nor, tone });
     }
     let area = 0;
     list.forEach((tr) => { tr.tn = Math.min(1, (tr.tone[tr.t[0]] + tr.tone[tr.t[1]] + tr.tone[tr.t[2]]) / 3); area += tr.area; });
-    return { list, cdf: new Float64Array(list.length), sum: 0, area, verts: vertsTotal, skin: -1 };
-  })();
-  // the same skin as one invisible mesh: drawn first into a depth picture, so dots behind the body can be hidden
-  const MESH = (() => {
-    let nv = 0, ni = 0; for (const pt of PARTS) { nv += pt.pos.length / 3; ni += pt.tris.length * 3; }
+    return { list, cdf: new Float64Array(list.length), sum: 0, area, skin: -1 };
+  }
+  function meshOf(parts) {
+    let nv = 0, ni = 0; for (const pt of parts) { nv += pt.pos.length / 3; ni += pt.tris.length * 3; }
     const vtx = new Float32Array(nv * 7), idx = new Uint32Array(ni); let vo = 0, io = 0;
-    for (const pt of PARTS) {
+    for (const pt of parts) {
       const n = pt.pos.length / 3;
       for (let k = 0; k < n; k++) vtx.set([pt.pos[k * 3], pt.pos[k * 3 + 1], pt.pos[k * 3 + 2], pt.nor[k * 3], pt.nor[k * 3 + 1], pt.nor[k * 3 + 2], pt.jw[k]], (vo + k) * 7);
       for (const t of pt.tris) { idx[io++] = t[0] + vo; idx[io++] = t[1] + vo; idx[io++] = t[2] + vo; }
       vo += n;
     }
     return { vtx, idx };
-  })();
+  }
 
-  // throw n dots onto the skin: pick a triangle on the running total, then a random point inside it
-  function dotsOf(n, skin) {
-    if (TRI.skin !== skin) {                               // chance = area × tone (Skin marks sets how much the tone counts)
-      let sum = 0;
-      TRI.list.forEach((tr, i) => { sum += tr.area * (1 - 0.45 * skin * (1 - tr.tn)); TRI.cdf[i] = sum; });
-      TRI.sum = sum; TRI.skin = skin;
+  // build one whale: skin parts, skeleton, the hinge of its jaw
+  let TRI, BONE, MESH, HINGE = [0, 0], boneCount = 0;
+  function buildWhale(name) {
+    species = name; SP = SPECIES[name]; seed = 1851;
+    SCARS = Array.from({ length: name === 'blue' ? 10 : 22 }, () => ({ s: 0.12 + rand() * 0.7, th: rand() * Math.PI * 2, a: rand() * Math.PI, len: 0.02 + rand() * 0.07 }));
+    const flips = [1, -1].map(flipperOf);
+    let parts, jwOf = () => 1;
+    if (name === 'blue') {
+      const sC = SP.corner;
+      jwOf = (s) => 1 - smooth(sC - 0.03, sC + 0.012, s);
+      EYE = (() => { const e = sectionAt(0.212, -SP.mouth + 0.13); return [e[0], e[1], Math.abs(e[2])]; })();
+      parts = blueParts(jwOf);
+      const h = sectionAt(sC, -SP.mouth); HINGE = [h[0], h[1]];
+    } else {
+      EYE = (() => { const s = 0.285, P = profile(s); return [1 - 2 * s, P.yc - P.B * 0.42, P.W * 0.93]; })();
+      parts = spermParts();
+      HINGE = jawAt(0.32).c;
     }
-    const out = new Float32Array(n * 8), { list, cdf, sum } = TRI;
+    parts.push(...flips.map((f) => f.skin), fluke(1), fluke(-1));
+    const bones = skeleton(flips, jwOf);
+    boneCount = bones.length;
+    TRI = triangles(parts); BONE = triangles(bones);
+    MESH = { skin: meshOf(parts), bone: meshOf(bones) };
+  }
+  buildWhale('blue');
+
+  // throw n dots: a quarter on the bones, the rest on the skin. Pick a triangle on the running total, then a random point inside it.
+  function weigh(T, skin) {                                // chance = area × tone (Skin marks sets how much the tone counts)
+    if (T.skin === skin) return;
+    let sum = 0;
+    T.list.forEach((tr, i) => { sum += tr.area * (1 - 0.45 * skin * (1 - tr.tn)); T.cdf[i] = sum; });
+    T.sum = sum; T.skin = skin;
+  }
+  function dotsOf(n, skin) {
+    weigh(TRI, skin); weigh(BONE, 0);
+    const out = new Float32Array(n * 9), nBone = Math.round(n * 0.25);
     for (let k = 0; k < n; k++) {
+      const bone = k >= n - nBone, T = bone ? BONE : TRI, { list, cdf, sum } = T;
       const u = Math.random() * sum; let a = 0, b = list.length - 1;
       while (a < b) { const m = (a + b) >> 1; if (cdf[m] < u) a = m + 1; else b = m; }
-      const tr = list[a], [i0, i1, i2] = tr.t, P = tr.part.pos;
-      let r1 = Math.sqrt(Math.random()), r2 = Math.random();
-      const w0 = 1 - r1, w1 = r1 * (1 - r2), w2 = r1 * r2;
-      const o = k * 8;
+      const tr = list[a], [i0, i1, i2] = tr.t, P = tr.part.pos, J = tr.part.jw;
+      const r1 = Math.sqrt(Math.random()), r2 = Math.random(), w0 = 1 - r1, w1 = r1 * (1 - r2), w2 = r1 * r2;
+      const o = k * 9;
       for (let c = 0; c < 3; c++) {
         out[o + c] = P[i0 * 3 + c] * w0 + P[i1 * 3 + c] * w1 + P[i2 * 3 + c] * w2;
         out[o + 3 + c] = tr.nor[i0 * 3 + c] * w0 + tr.nor[i1 * 3 + c] * w1 + tr.nor[i2 * 3 + c] * w2;
       }
       out[o + 6] = tr.tone[i0] * w0 + tr.tone[i1] * w1 + tr.tone[i2] * w2;
-      const J = tr.part.jw; out[o + 7] = J[i0] * w0 + J[i1] * w1 + J[i2] * w2;
+      out[o + 7] = J[i0] * w0 + J[i1] * w1 + J[i2] * w2;
+      out[o + 8] = bone ? 1 : 0;
     }
     return out;
   }
@@ -421,19 +598,19 @@
   const DEPTH_VS = `#version 300 es
   precision highp float;
   layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor; layout(location = 3) in float aJaw;
-  uniform mat4 uView; uniform mat4 uProj; out float vD;
+  uniform mat4 uView; uniform mat4 uProj; uniform float uShrink; out float vD;
   ${SWIM}
-  void main() { vec3 p = aPos, n = aNor; openJaw(p, n, aJaw); swim(p, n); p -= n * 0.006; p = (uModel * vec4(p, 1.0)).xyz; vec4 v = uView * vec4(p, 1.0); vD = -v.z; gl_Position = uProj * v; }`;
+  void main() { vec3 p = aPos, n = aNor; openJaw(p, n, aJaw); swim(p, n); p -= n * uShrink; p = (uModel * vec4(p, 1.0)).xyz; vec4 v = uView * vec4(p, 1.0); vD = -v.z; gl_Position = uProj * v; }`;
   const DEPTH_FS = `#version 300 es
-  precision highp float; in float vD; out vec4 o; void main() { o = vec4(vD, 0.0, 0.0, 1.0); }`;
+  precision highp float; in float vD; out vec4 o; void main() { o = vec4(vD, vD, 0.0, 1.0); }`;
   const DOT_VS = `#version 300 es
   precision highp float;
-  layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor; layout(location = 2) in float aTone; layout(location = 3) in float aJaw;
+  layout(location = 0) in vec3 aPos; layout(location = 1) in vec3 aNor; layout(location = 2) in float aTone; layout(location = 3) in float aJaw; layout(location = 4) in float aBone;
   uniform mat4 uView; uniform mat4 uProj; uniform vec3 uCam; uniform vec3 uLight; uniform float uAspect;
   uniform float uTime; uniform float uGather; uniform float uSea; uniform float uFrame;
   uniform float uSize; uniform float uWeight; uniform float uAperture; uniform float uFocusDist; uniform float uLensPx; uniform float uDist0;
   uniform float uSolid; uniform float uRim; uniform float uSkin; uniform int uInk; uniform float uTint;
-  uniform float uShatterT; uniform float uShatterAmt; uniform vec2 uShatterAt; uniform vec2 uPx; uniform sampler2D uDepth;
+  uniform float uShatterT; uniform float uShatterAmt; uniform vec2 uShatterAt; uniform vec2 uPx; uniform sampler2D uDepth; uniform float uXray;
   out vec3 vCol; out float vW;
   ${SWIM}
   uint hash(uint x) { x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
@@ -444,7 +621,8 @@
     vec3 p = aPos, n = aNor;
     openJaw(p, n, aJaw);
     swim(p, n);
-    float glow = ripple(p, n, rnd(id * 17u + 9u));
+    bool bone = aBone > 0.5;
+    float glow = bone ? 0.0 : ripple(p, n, rnd(id * 17u + 9u));
     p = (uModel * vec4(p, 1.0)).xyz; n = normalize(mat3(uModel) * n);
     // gather: each dot comes in from the sea with its own delay; sea dots never arrive
     bool sea = rnd(id * 7u + 3u) < uSea;
@@ -478,9 +656,13 @@
     float ndv = dot(n, V);
     // hidden behind the body? compare with the depth picture of the invisible mesh (only while the dot sits on the skin)
     vec2 suv = gl_Position.xy / gl_Position.w * 0.5 + 0.5;
-    float md = textureLod(uDepth, suv, 0.0).r;
+    vec2 md = textureLod(uDepth, suv, 0.0).rg;               // r = skin, g = skeleton
+    bool inView = all(greaterThan(suv, vec2(0.0))) && all(lessThan(suv, vec2(1.0)));
     float onSkin = g * (1.0 - clamp(burst * 3.0, 0.0, 1.0));
-    float face = (depth > md + 0.012 && all(greaterThan(suv, vec2(0.0))) && all(lessThan(suv, vec2(1.0)))) ? mix(1.0, 0.0, uSolid * onSkin) : 1.0;
+    bool behindSkin = inView && depth > md.r + 0.012, behindBone = inView && depth > md.g + 0.006;
+    float face;
+    if (!bone) face = (behindSkin ? mix(1.0, 0.0, uSolid * onSkin * (1.0 - uXray)) : 1.0) * mix(1.0, 0.2, uXray);   // X-ray: the skin turns to faint glass
+    else face = uXray * (behindBone ? mix(1.0, 0.08, uSolid * onSkin) : 1.0);                                       // bones only show in X-ray, in front of each other
     vec3 L = normalize(uLight);
     float lam = max(0.0, dot(n, L));
     float rim = pow(1.0 - abs(ndv), 3.0) * g;
@@ -491,11 +673,14 @@
       vec3 lit = vec3(1.0, 0.965, 0.91), deep = vec3(0.32, 0.5, 0.85);
       col = mix(deep, lit, smoothstep(0.0, 0.8, lam));
       k = ((0.12 + 0.95 * lam) * tone + uRim * rim * 1.1) * face;
+      if (!bone) col = mix(col, vec3(0.42, 0.62, 1.0), uXray * 0.75);
+      else { col = mix(vec3(0.75, 0.68, 0.6), vec3(1.0, 0.96, 0.88), lam); k = ((0.3 + 0.9 * lam) + uRim * rim * 1.4) * face * 1.3; }
       if (sea) { col = vec3(0.55, 0.7, 0.95); k = 0.35; }
     } else {
       col = vec3(1.0, 0.85, 0.74);                                      // soaks up light like #101820 ink
       float shade = pow(1.0 - lam, 2.2);
       k = ((0.02 + 1.1 * shade) * (2.2 - 1.2 * tone) * 0.6 + uRim * rim * 1.4) * face;
+      if (bone) k = ((0.15 + 1.0 * shade) * 0.7 + uRim * rim * 1.6) * face * 1.3;
       if (sea) { k = 0.3; }
     }
     col = mix(vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), col, uTint);
@@ -539,16 +724,23 @@
   const dotBuf = gl.createBuffer();
   gl.bindVertexArray(dotVao);
   gl.bindBuffer(gl.ARRAY_BUFFER, dotBuf);
-  [[0, 3, 0], [1, 3, 12], [2, 1, 24], [3, 1, 28]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 32, off); });
+  [[0, 3, 0], [1, 3, 12], [2, 1, 24], [3, 1, 28], [4, 1, 32]].forEach(([loc, size, off]) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 36, off); });
   gl.bindVertexArray(emptyVao);
-  const meshVao = gl.createVertexArray();
-  gl.bindVertexArray(meshVao);
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, MESH.vtx, gl.STATIC_DRAW);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, MESH.idx, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 28, 0);
-  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 28, 12);
-  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 28, 24);
-  gl.bindVertexArray(emptyVao);
+  const meshGL = ['skin', 'bone'].map(() => ({ vao: gl.createVertexArray(), vb: gl.createBuffer(), ib: gl.createBuffer(), n: 0 }));
+  function uploadMeshes() {
+    [MESH.skin, MESH.bone].forEach((m, i) => {
+      const g = meshGL[i];
+      gl.bindVertexArray(g.vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, g.vb); gl.bufferData(gl.ARRAY_BUFFER, m.vtx, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g.ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 28, 0);
+      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 28, 12);
+      gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 28, 24);
+      g.n = m.idx.length;
+    });
+    gl.bindVertexArray(emptyVao);
+  }
+  uploadMeshes();
   let dotCount = 0, built = -1;
   const ripples = [], ripBuf = new Float32Array(RIP_MAX * 4);
   function setRipples(u) {
@@ -689,7 +881,7 @@
     const half = (cam.dist - depth) * Math.tan(fov / 2) * Math.max(room, 0.5) / Math.max(0.3, Math.abs(Math.cos(slant))) + 1.4;
     route = { mid, dir, half, s: first ? -0.15 : -half, yaw: Math.atan2(-dir[2], dir[0]), rise: (Math.random() - 0.5) * 0.12 };
   }
-  let clock = 0, swimT = 0, mouthT = 0, jawAngle = 0, gatherStart = 0, shatterStart = -99, shatterAt = [0, 0];
+  let xray = 0, clock = 0, swimT = 0, mouthT = 0, jawAngle = 0, gatherStart = 0, shatterStart = -99, shatterAt = [0, 0];
   function scatter(at) { if (clock - shatterStart < S.gather * 0.6) return; shatterAt = at || [0, 0]; shatterStart = clock; }
   function regather() { gatherStart = clock; }
 
@@ -708,6 +900,7 @@
     const cyc = S.chew ? smooth(0.05, 0.3, ph) * (1 - smooth(0.5, 0.68, ph)) : 1;
     const jawWant = S.mouth * 0.61 * cyc;                   // up to ~35°
     jawAngle += (jawWant - jawAngle) * Math.min(1, dt * 6);
+    xray += ((S.xray ? 1 : 0) - xray) * Math.min(1, dt * (reduceMotion ? 20 : 3));
     const want = DOT_COUNTS[S.dots];
     if (built !== want) buildDots(want);
 
@@ -753,7 +946,7 @@
     // 1 · the hidden mesh → depth picture
     gl.bindFramebuffer(gl.FRAMEBUFFER, dep.fb);
     gl.viewport(0, 0, dep.w, dep.h);
-    gl.clearColor(1e4, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.clearColor(0, 0, 0, 0);
+    gl.clearColor(1e4, 1e4, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.clearColor(0, 0, 0, 0);
     gl.enable(gl.DEPTH_TEST);
     gl.useProgram(depthP.p);
     gl.uniformMatrix4fv(depthP.u.uView, false, view);
@@ -761,8 +954,14 @@
     gl.uniformMatrix4fv(depthP.u.uModel, false, model);
     gl.uniform1f(depthP.u.uSwimT, swimT); gl.uniform1f(depthP.u.uSwim, S.swim);
     gl.uniform1f(depthP.u.uJaw, jawAngle); gl.uniform2f(depthP.u.uHinge, HINGE[0], HINGE[1]);
-    gl.bindVertexArray(meshVao);
-    gl.drawElements(gl.TRIANGLES, MESH.idx.length, gl.UNSIGNED_INT, 0);
+    gl.colorMask(true, false, false, false); gl.uniform1f(depthP.u.uShrink, 0.006);
+    gl.bindVertexArray(meshGL[0].vao); gl.drawElements(gl.TRIANGLES, meshGL[0].n, gl.UNSIGNED_INT, 0);
+    if (xray > 0.01) {
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.colorMask(false, true, false, false); gl.uniform1f(depthP.u.uShrink, 0.0015);
+      gl.bindVertexArray(meshGL[1].vao); gl.drawElements(gl.TRIANGLES, meshGL[1].n, gl.UNSIGNED_INT, 0);
+    }
+    gl.colorMask(true, true, true, true);
     gl.disable(gl.DEPTH_TEST);
 
     // 2 · the dots, added up as light (or ink)
@@ -788,6 +987,7 @@
       gl.uniform1f(u.uSwimT, swimT);
       gl.uniform1f(u.uSwim, S.swim);
       setRipples(u);
+      gl.uniform1f(u.uXray, xray);
       gl.uniform1f(u.uJaw, jawAngle); gl.uniform2f(u.uHinge, HINGE[0], HINGE[1]);
       gl.uniform1f(u.uGather, Math.min(1.0001, (clock - gatherStart) / S.gather));
       gl.uniform1f(u.uSea, S.sea);
@@ -830,12 +1030,11 @@
   // =====================================================================
   const mathEl = document.getElementById('math');
   function drawMath() {
-    const parts = {}; for (const tr of TRI.list) parts[tr.part.name] = (parts[tr.part.name] || 0) + 1;
     mathEl.innerHTML =
-      `section: |z/W|<sup>n</sup> + |y/H|<sup>n</sup> = 1 <span>n = 3.8 at the head → 2 at the tail</span><br>` +
-      `${TRI.list.length.toLocaleString('en')} triangles <span>(body ${parts.body.toLocaleString('en')}, jaw, 36 teeth, 2 flippers, 2 flukes)</span><br>` +
+      `section: |z/W|<sup>n</sup> + |y/H|<sup>n</sup> = 1 <span>n = ${SP.keys.n[0]} at the head → 2 at the tail</span><br>` +
+      `${TRI.list.length.toLocaleString('en')} skin triangles, ${BONE.list.length.toLocaleString('en')} bone triangles <span>(${boneCount} bones)</span><br>` +
       `P(triangle) ∝ area × (1 − ${(0.45 * S.skin).toFixed(2)} · (1 − tone))<br>` +
-      `${dotCount.toLocaleString('en')} dots on ${TRI.area.toFixed(2)} units² of skin <span>(the whale is 2 units long)</span>`;
+      `${Math.round(dotCount * 0.75).toLocaleString('en')} dots on ${TRI.area.toFixed(2)} units² of skin, ${Math.round(dotCount * 0.25).toLocaleString('en')} on the bones <span>(the whale is 2 units long)</span>`;
   }
   const fmt = {
     dots: (v) => (DOT_COUNTS[v] >= 1e6 ? DOT_COUNTS[v] / 1e6 + 'M' : DOT_COUNTS[v] / 1e3 + 'K'),
@@ -849,6 +1048,7 @@
       document.querySelector(`output[for="${id}"]`).textContent = (fmt[id] || ((v) => (+v).toFixed(2)))(S[id]);
     }
     press('inkOff', !S.ink); press('inkOn', S.ink); press('chewOn', S.chew); press('chewOff', !S.chew); press('roamOn', S.roam); press('roamOff', !S.roam);
+    press('spBlue', S.species === 'blue'); press('spSperm', S.species === 'sperm'); press('xrayOff', !S.xray); press('xrayOn', S.xray);
     document.documentElement.dataset.paper = String(S.ink);
   }
   let skinTimer = 0;
@@ -858,6 +1058,15 @@
   });
   document.getElementById('inkOff').addEventListener('click', () => { S.ink = false; sync(); });
   document.getElementById('inkOn').addEventListener('click', () => { S.ink = true; sync(); });
+  function setSpecies(name) {
+    S.species = name; sync();
+    if (name === species) return;
+    buildWhale(name); uploadMeshes(); ripples.length = 0; built = -1;
+  }
+  document.getElementById('spBlue').addEventListener('click', () => setSpecies('blue'));
+  document.getElementById('spSperm').addEventListener('click', () => setSpecies('sperm'));
+  document.getElementById('xrayOff').addEventListener('click', () => { S.xray = false; sync(); });
+  document.getElementById('xrayOn').addEventListener('click', () => { S.xray = true; sync(); });
   document.getElementById('roamOn').addEventListener('click', () => { S.roam = true; sync(); });
   document.getElementById('roamOff').addEventListener('click', () => { S.roam = false; sync(); });
   document.getElementById('chewOn').addEventListener('click', () => { S.chew = true; mouthT = 0; sync(); });
@@ -865,7 +1074,7 @@
   document.getElementById('viewSide').addEventListener('click', () => { cam.goal = VIEWS.side; cam.vyaw = cam.vpitch = 0; });
   document.getElementById('viewFront').addEventListener('click', () => { cam.goal = VIEWS.front; cam.vyaw = cam.vpitch = 0; });
   document.getElementById('regather').addEventListener('click', regather);
-  document.getElementById('reset').addEventListener('click', () => { Object.assign(S, DEFAULTS); sync(); built = -1; cam.goal = VIEWS.side; cam.zoom = 1; });
+  document.getElementById('reset').addEventListener('click', () => { Object.assign(S, DEFAULTS); setSpecies(S.species); sync(); built = -1; cam.goal = VIEWS.side; cam.zoom = 1; });
   document.getElementById('copy').addEventListener('click', async () => {
     const line = 'Particle Whale settings: ' + JSON.stringify(S);
     const out = document.getElementById('copied'), ta = document.getElementById('settings');
@@ -875,7 +1084,7 @@
   const panel = document.getElementById('panel'), tog = document.getElementById('togglePanel');
   tog.addEventListener('click', () => { const open = panel.classList.toggle('open'); tog.setAttribute('aria-expanded', String(open)); tog.textContent = (open ? '⌄' : '⌃') + ' Settings'; });
   sync();
-  window.whale = { whaleAt, newRoute, get route() { return route; }, skinAt, ripples, S, cam, scatter, regather, settle() { gatherStart = clock - 99; shatterStart = clock - 99; }, get fps() { return fps; }, get dotCount() { return dotCount; }, get triangles() { return TRI.list.length; } };
+  window.whale = { setSpecies, get species() { return species; }, whaleAt, newRoute, get route() { return route; }, skinAt, ripples, S, cam, scatter, regather, settle() { gatherStart = clock - 99; shatterStart = clock - 99; }, get fps() { return fps; }, get dotCount() { return dotCount; }, get triangles() { return TRI.list.length; } };
 })();
 </script>
 </body>
